@@ -1,0 +1,18 @@
+.paginationArea{
+width:90%;
+margin:20px auto;
+display:grid;
+grid-template-columns:120px 1fr 120px;
+align-items:center;
+}
+
+button{
+cursor:pointer;
+padding:6px 10px;
+border-radius:4px;
+border:none;
+}
+
+button:hover{
+opacity:0.85;
+}

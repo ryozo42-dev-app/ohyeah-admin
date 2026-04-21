@@ -1,0 +1,234 @@
+body {
+  margin: 0;
+  font-family: sans-serif;
+  background: #d9d4cc;
+}
+
+/* レイアウト */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ヘッダー */
+.header {
+  height: 120px;
+  background: #7b5a36;
+  color: white;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 160px; /* サイドバーの幅分、中央位置を右にずらしてコンテンツと同期させる */
+  box-sizing: border-box;
+
+  font-size: 28px;
+  font-weight: bold;
+}
+
+/* コンテンツ */
+.content {
+  display: flex;
+  flex: 1;
+}
+
+/* サイドバー */
+.sidebar {
+  width: 160px;
+  background: #7b5a36;
+  color: white;
+  padding: 20px 10px;
+}
+
+/* ロゴ */
+.logo {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+/* メニュー */
+.menuList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  text-decoration: none;
+  font-size: 16px;
+  padding-left: 15px;
+}
+
+/* メイン */
+.main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.page {
+  width: 100%;
+  padding: 30px;
+  box-sizing: border-box;
+}
+
+/* ボタン */
+button {
+  background: #fff;
+  color: #333;
+  border: 1px solid #ccc;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+button:hover {
+  background: #f5f5f5;
+}
+
+/* active（押したとき） */
+button:active {
+  transform: scale(0.97);
+}
+
+/* 👇 削除専用 */
+.dangerText {
+  color: #b00020;
+  font-weight: bold;
+}
+/* テーブル全体 */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #bbb;
+  font-size: 14px;
+}
+
+/* ヘッダー */
+th {
+  background: linear-gradient(#e5e5e5, #d0d0d0);
+  border: 1px solid #bbb;
+  padding: 8px;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* セル */
+td {
+  border: 1px solid #ccc;
+  padding: 6px 8px;
+}
+
+/* 交互カラー（Access風） */
+tbody tr:nth-child(even) {
+  background: #f7f7f7;
+}
+
+/* ホバー */
+tbody tr:hover {
+  background: #dce9f9;
+}
+
+/* 選択状態 */
+tbody tr.selected {
+  background: #cfe2ff !important;
+}
+
+/* チェックボックス中央 */
+td input[type="checkbox"] {
+  transform: scale(1.1);
+}
+
+/* 画像セル */
+td img {
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+
+/* モーダル基本スタイル */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.modalContent {
+  background: #fff;
+  padding: 30px;
+  border-radius: 12px;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  color: #333;
+}
+
+.modalField {
+  margin-bottom: 15px;
+}
+
+.modalField label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.modalField input[type="text"],
+.modalField textarea {
+  width: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: inherit;
+}
+th:nth-child(1),
+td:nth-child(1) {
+  width: 40px;
+}
+
+th:nth-child(2),
+td:nth-child(2) {
+  width: 90px;
+}
+
+th:nth-child(3) { width: 260px; } /* ヘッダーはデフォルトの中央寄せ */
+td:nth-child(3) {
+  width: 260px;
+  text-align: left;
+}
+
+/* 4列目（本文）のレコードを左寄せ */
+td:nth-child(4) {
+  text-align: left;
+}
+
+th:nth-child(5),
+td:nth-child(5) {
+  width: 120px;
+}
+
+th:nth-child(6),
+td:nth-child(6) {
+  width: 80px;
+  text-align: center;
+}
+
+th:nth-child(7),
+td:nth-child(7) {
+  width: 140px;
+}
