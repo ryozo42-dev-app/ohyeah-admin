@@ -226,9 +226,9 @@ export default function Page() {
   ========================= */
 
   return (
-    <div className="page">
+    <div style={{ padding: "20px 30px" }}>
 
-      <h1 style={{ textAlign: "center" }}>News管理システム</h1>
+      <h1 style={{ textAlign: "center", margin: "0 0 10px" }}>News管理システム</h1>
 
       {/* table */}
       <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
@@ -247,7 +247,15 @@ export default function Page() {
         <tbody>
           {view.map((n, i) => (
             <tr key={n.id || i}>
-              <td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2",
+                  textAlign: "center"
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={selected.includes(n.id!)}
@@ -255,7 +263,14 @@ export default function Page() {
                 />
               </td>
 
-              <td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2"
+                }}
+              >
                 {n.imageUrl && (
                   <img
                     src={n.imageUrl}
@@ -268,14 +283,47 @@ export default function Page() {
                 )}
               </td>
 
-              <td>{n.title}</td>
-              <td>{n.body}</td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2"
+                }}
+              >
+                {n.title}
+              </td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2"
+                }}
+              >
+                {n.body}
+              </td>
 
-              <td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2"
+                }}
+              >
                 {n.date ? new Date(n.date).toLocaleDateString() : ""}
               </td>
 
-              <td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2",
+                  textAlign: "center"
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={n.isPublished}
@@ -283,7 +331,15 @@ export default function Page() {
                 />
               </td>
 
-              <td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2",
+                  textAlign: "center"
+                }}
+              >
                 <button onClick={() => {
                   setEditNews({ ...n })
                   setShowEditModal(true)
