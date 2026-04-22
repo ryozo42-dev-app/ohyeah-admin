@@ -24,8 +24,8 @@ export default function Drinks() {
   ])
 
   return (
-    <div style={{ padding: "30px" }}>
-      <h1 style={{ textAlign: "center" }}>Drink管理</h1>
+    <div style={{ padding: "20px 30px" }}>
+      <h1 style={{ textAlign: "center", margin: "0 0 10px" }}>Drink管理</h1>
 
       <table
         style={{
@@ -48,11 +48,56 @@ export default function Drinks() {
         <tbody>
           {drinks.map(d => (
             <tr key={d.id}>
-              <td>{d.name}</td>
-              <td>{d.name_en}</td>
-              <td>{d.drinkCategory}</td>
-              <td>{d.description}</td>
-              <td>¥{d.price}</td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2"
+                }}
+              >
+                {d.name}
+              </td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2"
+                }}
+              >
+                {d.name_en}
+              </td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2"
+                }}
+              >
+                {d.drinkCategory}
+              </td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2"
+                }}
+              >
+                {d.description}
+              </td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "4px 6px",
+                  fontSize: "14px",
+                  lineHeight: "1.2"
+                }}
+              >
+                ¥{d.price}
+              </td>
             </tr>
           ))}
         </tbody>

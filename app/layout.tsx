@@ -22,7 +22,17 @@ export default function RootLayout({
           <div className="content">
 
             {/* サイドバー */}
-            <aside className="sidebar">
+            <div
+              style={{
+                width: "220px",
+                background: "#7b5a36",
+                color: "#fff",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                paddingTop: "20px"
+              }}
+            >
               <div className="logo">ADMIN</div>
 
               <nav className="menuList">
@@ -58,7 +68,7 @@ export default function RootLayout({
                 </Link>
 
               </nav>
-            </aside>
+            </div>
 
             {/* メイン */}
             <div className="main">
