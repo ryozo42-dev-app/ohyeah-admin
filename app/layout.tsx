@@ -10,77 +10,88 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body>
-
-        <div className="app">
-
-          {/* ヘッダー */}
-          <div className="header">
-            Oh Yeah！管理ツール
+        <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+          {/* HEADER */}
+          <div
+            style={{
+              background: "#7b5a36",
+              color: "#fff",
+              padding: "40px 0", // 上下は40px、左右は0にしてpaddingLeftで調整
+              fontSize: "25px",
+              fontWeight: "bold",
+              display: "flex", // Flexboxを有効にする
+              paddingLeft: "220px", // サイドバーの幅と同じ220pxを左に確保
+              justifyContent: "center", // サイドバーを除いた残りの領域で中央揃え
+              alignItems: "center" // 垂直方向の中央揃え (任意だが、見た目を整える)
+            }}
+          >
+            {/* テキストをh2で囲み、デフォルトのマージンをリセット */}
+            <h2 style={{ margin: 0 }}>Oh Yeah！管理ツール</h2>
           </div>
 
-          {/* 下エリア */}
-          <div className="content">
-
-            {/* サイドバー */}
+          {/* BODY */}
+          <div style={{ display: "flex", flex: 1 }}>
+            {/* SIDEBAR */}
             <div
               style={{
                 width: "220px",
                 background: "#7b5a36",
-                color: "#fff",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                paddingTop: "20px"
+                color: "#fff"
               }}
             >
-              <div className="logo">ADMIN</div>
-
-              <nav className="menuList">
-
-                <Link href="/dashboard" className="menuItem">
-                  <Home size={20}/>
+              <div
+                className="logo"
+                style={{
+                  textAlign: "center",
+                  padding: "20px 0 10px",
+                  fontSize: "24px",
+                  fontWeight: "bold"
+                }}
+              >
+                ADMIN
+              </div>
+              <nav
+                className="menuList"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "20px"
+                }}
+              >
+                <Link href="/dashboard" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+                  <Home size={30} />
                   <span>Dashboard</span>
                 </Link>
-
-                <Link href="/users" className="menuItem">
-                  <Users size={20}/>
+                <Link href="/users" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+                  <Users size={30} />
                   <span>Users</span>
                 </Link>
-
-                <Link href="/drinks" className="menuItem">
-                  <Beer size={20}/>
+                <Link href="/drinks" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+                  <Beer size={30} />
                   <span>Drink</span>
                 </Link>
-
-                <Link href="/foods" className="menuItem">
-                  <Utensils size={20}/>
+                <Link href="/foods" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+                  <Utensils size={30} />
                   <span>Food</span>
                 </Link>
-
-                <Link href="/news" className="menuItem">
-                  <Newspaper size={20}/>
+                <Link href="/news" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+                  <Newspaper size={30} />
                   <span>News</span>
                 </Link>
-
-                <Link href="/slider" className="menuItem">
-                  <Image size={18}/>
+                <Link href="/slider" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+                  <Image size={30} />
                   <span>Slider</span>
                 </Link>
-
               </nav>
             </div>
 
-            {/* メイン */}
-            <div className="main">
-              <div className="page">
-                {children}
-              </div>
+            {/* MAIN */}
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              {children}
             </div>
-
           </div>
-
         </div>
-
       </body>
     </html>
   )
