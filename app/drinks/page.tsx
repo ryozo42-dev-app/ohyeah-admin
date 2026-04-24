@@ -341,33 +341,29 @@ export default function Drinks() {
         <table
         style={{
           width: "100%",
+          tableLayout: "fixed",
           borderCollapse: "collapse",
           background: "#fff",
-          tableLayout: "fixed",
           fontSize: "12px",
           lineHeight: "1.2"
         }}
       >
         <thead>
           <tr style={{ background: "#ddd" }}>
-            <th style={{ width: "15px", padding: "2px 4px" }}>
+            <th style={{ width: "3%" }}>
               <input
                 type="checkbox"
                 onChange={toggleAll}
                 checked={view.length > 0 && view.every(v => selected.includes(v.id))}
               />
             </th>
-
-            <th style={{ width: "40px", padding: "2px 4px" }}>名前</th>
-            <th style={{ width: "40px", padding: "2px 4px" }}>英語名</th>
-            <th style={{ width: "40px", padding: "2px 4px" }}>カテゴリー</th>
-
-            {/* 👇 ここを広く */}
-            <th style={{ padding: "2px 4px" }}>説明</th>
-
-            <th style={{ width: "40px", padding: "2px 4px" }}>価格</th>
-            <th style={{ width: "10px", padding: "2px 4px" }}>表示</th>
-            <th style={{ width: "40px", padding: "2px 4px" }}>操作</th>
+            <th style={{ width: "18%", textAlign: "center" }}>名前</th>
+            <th style={{ width: "18%", textAlign: "center" }}>英語名</th>
+            <th style={{ width: "10%", textAlign: "center" }}>カテゴリー</th>
+            <th style={{ width: "31%", textAlign: "center" }}>説明</th>
+            <th style={{ width: "8%", textAlign: "center" }}>価格</th>
+            <th style={{ width: "5%", textAlign: "center" }}>表示</th>
+            <th style={{ width: "7%", textAlign: "center" }}>操作</th>
           </tr>
         </thead>
 
@@ -403,13 +399,14 @@ export default function Drinks() {
                 style={{
                   border: "1px solid #ddd",
                   padding: "2px 4px",
-                  whiteSpace: "normal" // ← 折り返しOK
+                  whiteSpace: "normal",
+                  textAlign: "left"
                 }}
               >
                 {d.description || "-"}
               </td>
 
-              <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
+              <td style={{ border: "1px solid #ddd", padding: "2px 4px", textAlign: "right" }}>
                 ¥{d.price}
               </td>
 
@@ -568,23 +565,23 @@ export default function Drinks() {
         className="print-only"
         style={{
           width: "100%",
+          tableLayout: "fixed",
           borderCollapse: "collapse",
           background: "#fff",
-          tableLayout: "fixed",
           fontSize: "12px",
           lineHeight: "1.2"
         }}
       >
         <thead>
           <tr style={{ background: "#ddd" }}>
-            <th style={{ width: "15px", padding: "2px 4px" }}></th>
-            <th style={{ width: "40px", padding: "2px 4px" }}>名前</th>
-            <th style={{ width: "40px", padding: "2px 4px" }}>英語名</th>
-            <th style={{ width: "40px", padding: "2px 4px" }}>カテゴリー</th>
-            <th style={{ padding: "2px 4px" }}>説明</th>
-            <th style={{ width: "40px", padding: "2px 4px" }}>価格</th>
-            <th style={{ width: "10px", padding: "2px 4px" }}>表示</th>
-            <th style={{ width: "40px", padding: "2px 4px" }}></th>
+            <th style={{ width: "3%" }}></th>
+            <th style={{ width: "18%", textAlign: "center" }}>名前</th>
+            <th style={{ width: "18%", textAlign: "center" }}>英語名</th>
+            <th style={{ width: "10%", textAlign: "center" }}>カテゴリー</th>
+            <th style={{ width: "31%", textAlign: "center" }}>説明</th>
+            <th style={{ width: "8%", textAlign: "center" }}>価格</th>
+            <th style={{ width: "5%", textAlign: "center" }}>表示</th>
+            <th style={{ width: "7%", textAlign: "center" }}>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -604,12 +601,13 @@ export default function Drinks() {
                 style={{
                   border: "1px solid #ddd",
                   padding: "2px 4px",
-                  whiteSpace: "normal"
+                  whiteSpace: "normal",
+                  textAlign: "left"
                 }}
               >
                 {d.description || "-"}
               </td>
-              <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
+              <td style={{ border: "1px solid #ddd", padding: "2px 4px", textAlign: "right" }}>
                 ¥{d.price}
               </td>
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
@@ -937,15 +935,38 @@ export default function Drinks() {
 
             <select
               value={newCategory}
-              onChange={(e)=>setNewCategory(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === "__add__") {
+                  setShowAddCategory(true)
+                  return
+                }
+                setNewCategory(e.target.value)
+              }}
               style={{ width:"100%", marginTop:"10px" }}
             >
               <option value="">選択してください</option>
+              <option value="__add__">＋ カテゴリー追加</option>
 
               {categories.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+
+            {showAddCategory && (
+              <div style={{ marginTop: "10px" }}>
+                <input
+                  placeholder="新カテゴリー"
+                  value={newCategoryName}
+                  onChange={(e)=>setNewCategoryName(e.target.value)}
+                  style={{ width: "70%" }}
+                />
+                <button
+                  onClick={addCategory}
+                >
+                  追加
+                </button>
+              </div>
+            )}
 
             <div style={{
               marginTop:"20px",
