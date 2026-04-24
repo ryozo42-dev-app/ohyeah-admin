@@ -127,10 +127,12 @@ export default function Foods() {
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("menu_foods")
         .select("*")
         .order("id", { ascending: true })
+
+      console.log("Foods data:", data, "error:", error)
 
       setFoods(data || [])
     }
@@ -141,7 +143,7 @@ export default function Foods() {
   useEffect(() => {
     const loadCategories = async () => {
       const { data, error } = await supabase
-        .from("food_category")
+        .from("food_categories")
         .select("name")
         .order("name")
 
@@ -278,7 +280,7 @@ export default function Foods() {
     if (!newCategoryName.trim()) return
 
     const { error } = await supabase
-      .from("food_category")
+      .from("food_categories")
       .insert([{ name: newCategoryName.trim() }])
 
     if (error) {
@@ -1143,7 +1145,7 @@ export default function Foods() {
                     if (!name) return
 
                     const { error } = await supabase
-                      .from("food_category")
+                      .from("food_categories")
                       .insert([{ name }])
 
                     if (error) {

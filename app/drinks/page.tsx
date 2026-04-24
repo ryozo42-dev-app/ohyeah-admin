@@ -40,10 +40,13 @@ export default function Drinks() {
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("menu_drinks")
         .select("*")
         .order("id", { ascending: true })
+
+      console.log("Drinks data:", data, "error:", error)
+      console.log(process.env.NEXT_PUBLIC_SUPABASE_URL)
 
       setDrinks(data || [])
     }
@@ -53,10 +56,12 @@ export default function Drinks() {
 
   useEffect(() => {
     const loadCategories = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("drink_categories")
         .select("name")
         .order("name")
+
+      console.log("Drink categories data:", data, "error:", error)
 
       if (data) {
         setCategories(data.map(c => c.name))
