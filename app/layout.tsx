@@ -10,9 +10,10 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body>
-        <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+        <div className="app" style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
           {/* HEADER */}
-          <div
+          <header
+            className="header no-print"
             style={{
               background: "#7b5a36",
               color: "#fff",
@@ -27,12 +28,13 @@ export default function RootLayout({
           >
             {/* テキストをh2で囲み、デフォルトのマージンをリセット */}
             <h2 style={{ margin: 0 }}>Oh Yeah！管理ツール</h2>
-          </div>
+          </header>
 
           {/* BODY */}
-          <div style={{ display: "flex", flex: 1 }}>
+          <div className="content" style={{ display: "flex", flex: 1 }}>
             {/* SIDEBAR */}
-            <div
+            <aside
+              className="sidebar no-print"
               style={{
                 width: "220px",
                 background: "#7b5a36",
@@ -84,12 +86,12 @@ export default function RootLayout({
                   <span>Slider</span>
                 </Link>
               </nav>
-            </div>
+            </aside>
 
             {/* MAIN */}
-            <div style={{ flex: 1, overflowY: "auto" }}>
+            <main className="main" style={{ flex: 1, overflowY: "auto" }}>
               {children}
-            </div>
+            </main>
           </div>
         </div>
       </body>

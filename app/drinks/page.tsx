@@ -22,6 +22,10 @@ export default function Drinks() {
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
   const [categories, setCategories] = useState<string[]>([])
+  const [showPriceModal, setShowPriceModal] = useState(false)
+  const [newPrice, setNewPrice] = useState("")
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [newCategory, setNewCategory] = useState("")
   const [showAdd, setShowAdd] = useState(false)
   const [newDrink, setNewDrink] = useState({
     name: "",
@@ -75,10 +79,13 @@ export default function Drinks() {
   }
 
   const toggleAll = () => {
-    if (selected.length === view.length) {
-      setSelected([])
+    const viewIds = view.map(v => v.id)
+    const isAllSelected = viewIds.length > 0 && viewIds.every(id => selected.includes(id))
+
+    if (isAllSelected) {
+      setSelected(selected.filter(id => !viewIds.includes(id)))
     } else {
-      setSelected(view.map(v => v.id))
+      setSelected(Array.from(new Set([...selected, ...viewIds])))
     }
   }
 
@@ -123,6 +130,9 @@ export default function Drinks() {
 
     // UI更新
     setDrinks(drinks.filter(d => d.id !== id))
+
+    // 選択状態からも削除
+    setSelected(prev => prev.filter(s => s !== id))
   }
 
   const addDrink = async () => {
@@ -192,38 +202,172 @@ export default function Drinks() {
     setShowAddCategory(false)
   }
 
+  const bulkDelete = async () => {
+    if (selected.length === 0) {
+      alert("選択されていません")
+      return
+    }
+
+    if (!confirm(`${selected.length}件削除しますか？`)) return
+
+    const { error } = await supabase
+      .from("menu_drinks")
+      .delete()
+      .in("id", selected)
+
+    if (error) {
+      alert("削除失敗")
+      return
+    }
+
+    // UI更新
+    setDrinks(drinks.filter(d => !selected.includes(d.id)))
+
+    // 選択リセット
+    setSelected([])
+  }
+
+  const bulkUpdatePrice = async () => {
+    if (selected.length === 0) {
+      alert("選択されていません")
+      return
+    }
+
+    const price = Number(newPrice)
+
+    if (!newPrice || isNaN(price)) {
+      alert("価格を入力してください")
+      return
+    }
+
+    const { error } = await supabase
+      .from("menu_drinks")
+      .update({ price })
+      .in("id", selected)
+
+    if (error) {
+      alert("更新失敗")
+      return
+    }
+
+    // UI更新
+    setDrinks(drinks.map(d =>
+      selected.includes(d.id)
+        ? { ...d, price }
+        : d
+    ))
+
+    setSelected([])
+    setShowPriceModal(false)
+    setNewPrice("")
+  }
+
+  const bulkUpdateCategory = async () => {
+    if (selected.length === 0) {
+      alert("選択されていません")
+      return
+    }
+
+    if (!newCategory) {
+      alert("カテゴリーを選択してください")
+      return
+    }
+
+    const { error } = await supabase
+      .from("menu_drinks")
+      .update({ drinkcategory: newCategory })
+      .in("id", selected)
+
+    if (error) {
+      alert("更新失敗")
+      return
+    }
+
+    // UI更新
+    setDrinks(drinks.map(d =>
+      selected.includes(d.id)
+        ? { ...d, drinkcategory: newCategory }
+        : d
+    ))
+
+    setSelected([])
+    setShowCategoryModal(false)
+    setNewCategory("")
+  }
+
+  const exportCSV = () => {
+    if (drinks.length === 0) {
+      alert("データがありません")
+      return
+    }
+
+    // ヘッダー
+    const header = ["名前", "英語名", "カテゴリー", "説明", "価格"]
+
+    // データ
+    const rows = drinks.map(d => [
+      d.name,
+      d.name_en,
+      d.drinkcategory,
+      d.description || "",
+      d.price
+    ])
+
+    // CSV文字列作成
+    const csvContent = [
+      header.join(","),
+      ...rows.map(r => r.join(","))
+    ].join("\n")
+
+    // BOM付き（Excel対策）
+    const bom = "\uFEFF"
+
+    const blob = new Blob([bom + csvContent], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+
+    const link = document.createElement("a")
+    link.href = url
+    link.download = "drinks.csv"
+    link.click()
+  }
+
   return (
-    <div style={{ padding: "20px 30px" }}>
+    <div className="page" style={{ padding: "20px 30px" }}>
       <h1 style={{ textAlign: "center", margin: "0 0 10px", fontSize: "35px" }}>
         Drink管理
       </h1>
-
-      <table
+      {/* 画面表示用エリア（ページネーション・ボタン・操作用テーブル） */}
+      <div className="no-print">
+        <table
         style={{
           width: "100%",
           borderCollapse: "collapse",
           background: "#fff",
           tableLayout: "fixed",
           fontSize: "12px",
-          lineHeight: "1.1"
+          lineHeight: "1.2"
         }}
       >
         <thead>
           <tr style={{ background: "#ddd" }}>
-            <th style={{ width: "15px" }}>
-              <input type="checkbox" onChange={toggleAll} />
+            <th style={{ width: "15px", padding: "2px 4px" }}>
+              <input
+                type="checkbox"
+                onChange={toggleAll}
+                checked={view.length > 0 && view.every(v => selected.includes(v.id))}
+              />
             </th>
 
-            <th style={{ width: "40px", padding: "3px 4px" }}>名前</th>
-            <th style={{ width: "40px", padding: "3px 4px" }}>英語名</th>
-            <th style={{ width: "40px", padding: "3px 4px" }}>カテゴリー</th>
+            <th style={{ width: "40px", padding: "2px 4px" }}>名前</th>
+            <th style={{ width: "40px", padding: "2px 4px" }}>英語名</th>
+            <th style={{ width: "40px", padding: "2px 4px" }}>カテゴリー</th>
 
             {/* 👇 ここを広く */}
-            <th style={{ padding: "3px 4px" }}>説明</th>
+            <th style={{ padding: "2px 4px" }}>説明</th>
 
-            <th style={{ width: "40px", padding: "3px 4px" }}>価格</th>
-            <th style={{ width: "10px" }}>表示</th>
-            <th style={{ width: "40px" }}>操作</th>
+            <th style={{ width: "40px", padding: "2px 4px" }}>価格</th>
+            <th style={{ width: "10px", padding: "2px 4px" }}>表示</th>
+            <th style={{ width: "40px", padding: "2px 4px" }}>操作</th>
           </tr>
         </thead>
 
@@ -233,7 +377,7 @@ export default function Drinks() {
               key={d.id}
               style={{ opacity: d.isactive ? 1 : 0.4 }}
             >
-              <td style={{ border: "1px solid #ddd", textAlign: "center" }}>
+              <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
                 <input
                   type="checkbox"
                   checked={selected.includes(d.id)}
@@ -269,7 +413,7 @@ export default function Drinks() {
                 ¥{d.price}
               </td>
 
-              <td style={{ border: "1px solid #ddd", textAlign: "center" }}>
+              <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
                 <input
                   type="checkbox"
                   checked={d.isactive}
@@ -302,7 +446,8 @@ export default function Drinks() {
                   display: "flex", // Flexboxを有効にする
                   justifyContent: "center", // 水平方向の中央揃え
                   alignItems: "center", // 垂直方向の中央揃え
-                  height: "30px" // セルの高さを明示的に指定して中央揃えを安定させる
+                  height: "30px", // セルの高さを明示的に指定して中央揃えを安定させる
+                  padding: "2px 4px"
                 }}
               >
                 <button
@@ -330,7 +475,11 @@ export default function Drinks() {
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+
+        <div style={{ marginTop: "10px", fontSize: "14px", color: "#666" }}>
+        選択中: {selected.length} 件
+      </div>
 
       {/* ページャー */}
       <div style={{ marginTop: "10px", textAlign: "center" }}>
@@ -370,14 +519,40 @@ export default function Drinks() {
         >
           ドリンク追加
         </button>
-        <button style={{ fontSize: "12px" }}>一括価格変更</button>
-        <button style={{ fontSize: "12px" }}>一括カテゴリー変更</button>
+        <button
+          style={{ fontSize: "12px" }}
+          onClick={() => {
+            if (selected.length === 0) {
+              alert("選択されていません")
+              return
+            }
+            setShowPriceModal(true)
+          }}
+        >一括価格変更</button>
+        <button
+          style={{ fontSize: "12px" }}
+          onClick={() => {
+            if (selected.length === 0) {
+              alert("選択されていません")
+              return
+            }
+            setShowCategoryModal(true)
+          }}
+        >
+          一括カテゴリー変更
+        </button>
 
-        <button style={{ fontSize: "12px", color: "#d32f2f" }}>
+        <button
+          style={{ fontSize: "12px", color: "#d32f2f" }}
+          onClick={bulkDelete}
+        >
           一括削除
         </button>
 
-        <button style={{ fontSize: "12px", color: "#2e7d32" }}>
+        <button
+          onClick={exportCSV}
+          style={{ fontSize: "12px", color: "#2e7d32" }}
+        >
           CSV出力
         </button>
 
@@ -385,6 +560,66 @@ export default function Drinks() {
           一覧印刷
         </button>
       </div>
+      </div>
+
+      {/* 印刷用全件テーブル（通常は非表示、印刷時のみ drinks ステートから全件表示） */}
+      <table
+        id="print-area"
+        className="print-only"
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          background: "#fff",
+          tableLayout: "fixed",
+          fontSize: "12px",
+          lineHeight: "1.2"
+        }}
+      >
+        <thead>
+          <tr style={{ background: "#ddd" }}>
+            <th style={{ width: "15px", padding: "2px 4px" }}></th>
+            <th style={{ width: "40px", padding: "2px 4px" }}>名前</th>
+            <th style={{ width: "40px", padding: "2px 4px" }}>英語名</th>
+            <th style={{ width: "40px", padding: "2px 4px" }}>カテゴリー</th>
+            <th style={{ padding: "2px 4px" }}>説明</th>
+            <th style={{ width: "40px", padding: "2px 4px" }}>価格</th>
+            <th style={{ width: "10px", padding: "2px 4px" }}>表示</th>
+            <th style={{ width: "40px", padding: "2px 4px" }}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {drinks.map(d => (
+            <tr key={d.id} style={{ opacity: d.isactive ? 1 : 0.4 }}>
+              <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}></td>
+              <td style={{ border: "1px solid #ddd", padding: "2px 4px", whiteSpace: "nowrap" }}>
+                {d.name}
+              </td>
+              <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
+                {d.name_en}
+              </td>
+              <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
+                {d.drinkcategory}
+              </td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "2px 4px",
+                  whiteSpace: "normal"
+                }}
+              >
+                {d.description || "-"}
+              </td>
+              <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
+                ¥{d.price}
+              </td>
+              <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
+                {d.isactive ? "○" : "×"}
+              </td>
+              <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {showEdit && editDrink && (
         <div style={{
@@ -618,6 +853,115 @@ export default function Drinks() {
             }}>
               <button onClick={()=>setShowAdd(false)}>キャンセル</button>
               <button onClick={addDrink}>登録</button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 一括価格変更モーダル */}
+      {showPriceModal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          background: "rgba(0,0,0,0.4)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}>
+          <div style={{
+            background: "#fff",
+            padding: "20px",
+            borderRadius: "8px",
+            width: "300px"
+          }}>
+
+            <h3>一括価格変更</h3>
+
+            <div style={{ display: "flex", alignItems: "center", marginTop: "10px" }}>
+              <span style={{ marginRight: "4px" }}>¥</span>
+
+              <input
+                type="number"
+                placeholder="価格"
+                value={newPrice}
+                onChange={(e) => setNewPrice(e.target.value)}
+                style={{ width: "100%" }}
+              />
+            </div>
+
+            <div style={{
+              marginTop:"20px",
+              display:"flex",
+              justifyContent:"space-between"
+            }}>
+              <button onClick={()=>{
+                setShowPriceModal(false)
+                setNewPrice("")
+              }}>
+                キャンセル
+              </button>
+
+              <button onClick={bulkUpdatePrice}>
+                変更
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {showCategoryModal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          background: "rgba(0,0,0,0.4)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}>
+          <div style={{
+            background: "#fff",
+            padding: "20px",
+            borderRadius: "8px",
+            width: "300px"
+          }}>
+
+            <h3>一括カテゴリー変更</h3>
+
+            <select
+              value={newCategory}
+              onChange={(e)=>setNewCategory(e.target.value)}
+              style={{ width:"100%", marginTop:"10px" }}
+            >
+              <option value="">選択してください</option>
+
+              {categories.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <div style={{
+              marginTop:"20px",
+              display:"flex",
+              justifyContent:"space-between"
+            }}>
+              <button onClick={()=>{
+                setShowCategoryModal(false)
+                setNewCategory("")
+              }}>
+                キャンセル
+              </button>
+
+              <button onClick={bulkUpdateCategory}>
+                変更
+              </button>
             </div>
 
           </div>
