@@ -232,3 +232,79 @@ th:nth-child(7),
 td:nth-child(7) {
   width: 140px;
 }
+
+@media print {
+
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  /* 背景 */
+  body {
+    background: #fff;
+  }
+
+  /* ❗ クラス名 (.header, .sidebar) を指定して確実に消す */
+  .header,
+  .sidebar,
+  header,
+  aside,
+  nav,
+  footer,
+  .modalOverlay {
+    display: none !important;
+  }
+
+  /* ❗ 画面用の操作要素（ページャー・ボタン・チェックボックス等）を消す */
+  .no-print,
+  button,
+  input[type="checkbox"] {
+    display: none !important;
+  }
+
+  /* ❗ レイアウトのリセット（Flexを解除して全幅にする） */
+  .app, .content, .main, .page {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* ❗ 印刷用の全件テーブルを表示する */
+  .print-only {
+    display: table !important;
+    width: 100% !important;
+  }
+
+  /* ❗ レイアウトを通常に戻す（重要） */
+  #print-area {
+    position: static !important;
+    width: 100%;
+  }
+
+  /* ❗ 改ページを許可 */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+}
+
+/* 通常時は印刷用要素を隠す */
+.print-only {
+  display: none;
+}
