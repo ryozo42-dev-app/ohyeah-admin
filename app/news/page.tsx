@@ -20,12 +20,15 @@ export default function Page() {
   const [page, setPage] = useState(1)
 
   const [showAdd, setShowAdd] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
 
-  const [editNews, setEditNews] = useState<News | null>(null)
+  const [editNews, setEditNews] = useState<any>(null)
 
-  const [modalImage, setModalImage] = useState("")
   const [showImageModal, setShowImageModal] = useState(false)
+  const [targetNews, setTargetNews] = useState<any>(null)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
 
   const [newNews, setNewNews] = useState({
     title: "",
@@ -201,24 +204,71 @@ export default function Page() {
   }
 
   /* -------------------------
+  image update
+  ------------------------- */
+
+  const handleImageUpdate = async (file: File) => {
+
+    if (!targetNews) return
+
+    setUploading(true)
+
+    const fileName = `${Date.now()}_${file.name}`
+
+    const { error: uploadError } = await supabase.storage
+      .from("news-images")
+      .upload(fileName, file)
+
+    if (uploadError) {
+      alert("画像アップロード失敗")
+      console.error(uploadError)
+      setUploading(false)
+      return
+    }
+
+    const { data } = supabase.storage
+      .from("news-images")
+      .getPublicUrl(fileName)
+
+    const imageUrl = data.publicUrl
+
+    await supabase
+      .from("news")
+      .update({ imageUrl })
+      .eq("id", targetNews.id)
+
+    // UI更新
+    setNews(news.map(n => n.id === targetNews.id ? { ...n, imageUrl } : n))
+    setTargetNews({ ...targetNews, imageUrl })
+    setUploading(false)
+  }
+
+  /* -------------------------
   edit
   ------------------------- */
 
   const saveEdit = async () => {
     if (!editNews?.id) return
 
-    await supabase
+    const { error } = await supabase
       .from("news")
       .update({
         title: editNews.title,
         body: editNews.body,
-        imageUrl: editNews.imageUrl || "",
         isPublished: editNews.isPublished
       })
       .eq("id", editNews.id)
 
-    setShowEditModal(false)
-    await load()
+    if (error) {
+      alert("更新失敗")
+      return
+    }
+
+    setNews(news.map(n =>
+      n.id === editNews.id ? editNews : n
+    ))
+
+    setShowEdit(false)
   }
 
   /* =========================
@@ -274,9 +324,9 @@ export default function Page() {
                 {n.imageUrl && (
                   <img
                     src={n.imageUrl}
-                    style={{ height: 60, width: 80, objectFit: "cover", cursor: "pointer" }}
+                    style={{ width: "40px", height: "40px", objectFit: "cover", cursor: "pointer" }}
                     onClick={() => {
-                      setModalImage(n.imageUrl || "")
+                      setTargetNews(n)
                       setShowImageModal(true)
                     }}
                   />
@@ -342,7 +392,7 @@ export default function Page() {
               >
                 <button onClick={() => {
                   setEditNews({ ...n })
-                  setShowEditModal(true)
+                  setShowEdit(true)
                 }}>編集</button>
 
                 <button className="dangerText" onClick={() => deleteRow(n.id!)}>削除</button>
@@ -436,6 +486,153 @@ export default function Page() {
               <button onClick={() => setShowAdd(false)}>キャンセル</button>
               <button onClick={addNews}>投稿する</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 編集モーダル */}
+      {showEdit && editNews && (
+        <div className="modalOverlay">
+          <div className="modalContent">
+            <h3 style={{ marginTop: 0 }}>ニュース編集</h3>
+
+            <div className="modalField">
+              <label>タイトル</label>
+              <input
+                type="text"
+                value={editNews.title}
+                onChange={(e) => setEditNews({ ...editNews, title: e.target.value })}
+              />
+            </div>
+
+            <div className="modalField">
+              <label>本文</label>
+              <textarea
+                rows={5}
+                value={editNews.body}
+                onChange={(e) => setEditNews({ ...editNews, body: e.target.value })}
+              />
+            </div>
+
+            <div className="modalField">
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={editNews.isPublished}
+                  onChange={(e) => setEditNews({
+                    ...editNews,
+                    isPublished: e.target.checked
+                  })}
+                />
+                公開する
+              </label>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 20 }}>
+              <button onClick={() => setShowEdit(false)}>
+                キャンセル
+              </button>
+              <button onClick={saveEdit}>
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 画像変更モーダル */}
+      {showImageModal && targetNews && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          background: "rgba(0,0,0,0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 999
+        }}>
+          <div style={{
+            background: "#fff",
+            padding: "20px",
+            borderRadius: "8px",
+            width: "400px",
+            textAlign: "center"
+          }}>
+
+            <h3>画像変更</h3>
+
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginBottom: "20px"
+            }}>
+
+              {/* 現在 */}
+              <div>
+                <p>現在</p>
+                {targetNews.imageUrl ? (
+                  <img src={targetNews.imageUrl} style={{ width: "140px", height: "140px", objectFit: "cover", border: "1px solid #eee" }} alt="現在の画像" />
+                ) : (
+                  <div style={{ width: "140px", height: "140px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #ccc" }}>
+                    画像なし
+                  </div>
+                )}
+              </div>
+
+              {/* 変更後 */}
+              <div>
+                <p>変更後</p>
+                {previewImage ? (
+                  <img src={previewImage} style={{ width: "140px", height: "140px", objectFit: "cover", border: "1px solid #eee" }} alt="プレビュー画像" />
+                ) : (
+                  <div style={{ width: "140px", height: "140px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #ccc" }}>
+                    未選択
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                setSelectedFile(file)
+                setPreviewImage(URL.createObjectURL(file))
+              }}
+            />
+
+            {uploading && <p>アップロード中...</p>}
+
+            <div style={{ marginTop: "20px", display: "flex", justifyContent: "center", gap: "10px" }}>
+              <button onClick={() => {
+                setShowImageModal(false)
+                setPreviewImage(null)
+                setSelectedFile(null)
+                setTargetNews(null) // モーダルを閉じる際にtargetNewsもリセット
+              }}>
+                キャンセル
+              </button>
+
+              <button onClick={async () => {
+                if (!selectedFile) {
+                  alert("画像を選択してください")
+                  return
+                }
+                await handleImageUpdate(selectedFile)
+                setShowImageModal(false)
+                setPreviewImage(null)
+                setSelectedFile(null)
+                setTargetNews(null) // モーダルを閉じる際にtargetNewsもリセット
+              }}>
+                変更
+              </button>
+            </div>
+
           </div>
         </div>
       )}
