@@ -29,6 +29,7 @@ export default function Page() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   const [newNews, setNewNews] = useState({
     title: "",
@@ -250,6 +251,8 @@ export default function Page() {
   const saveEdit = async () => {
     if (!editNews?.id) return
 
+    setUpdatingId(editNews.id)
+
     const { error } = await supabase
       .from("news")
       .update({
@@ -260,6 +263,7 @@ export default function Page() {
       .eq("id", editNews.id)
 
     if (error) {
+      setUpdatingId(null)
       alert("更新失敗")
       return
     }
@@ -269,6 +273,7 @@ export default function Page() {
     ))
 
     setShowEdit(false)
+    setUpdatingId(null)
   }
 
   /* =========================
@@ -281,16 +286,23 @@ export default function Page() {
       <h1 style={{ textAlign: "center", margin: "0 0 10px" }}>News管理システム</h1>
 
       {/* table */}
-      <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
+      <table
+        style={{
+          width: "100%",
+          tableLayout: "fixed",
+          borderCollapse: "collapse",
+          background: "#fff"
+        }}
+      >
         <thead>
           <tr style={{ background: "#ddd" }}>
-            <th><input type="checkbox" /></th>
-            <th>画像</th>
-            <th>タイトル</th>
-            <th>本文</th>
-            <th>日付</th>
-            <th>公開</th>
-            <th>操作</th>
+            <th style={{ width: "3%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}><input type="checkbox" /></th>
+            <th style={{ width: "7%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>画像</th>
+            <th style={{ width: "23%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>タイトル</th>
+            <th style={{ width: "42%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>本文</th>
+            <th style={{ width: "10%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>日付</th>
+            <th style={{ width: "3%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>公開</th>
+            <th style={{ width: "12%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>操作</th>
           </tr>
         </thead>
 
@@ -300,8 +312,8 @@ export default function Page() {
               <td
                 style={{
                   border: "1px solid #ddd",
-                  padding: "4px 6px",
-                  fontSize: "14px",
+                  padding: "3px 6px",
+                  fontSize: "12px",
                   lineHeight: "1.2",
                   textAlign: "center"
                 }}
@@ -316,15 +328,22 @@ export default function Page() {
               <td
                 style={{
                   border: "1px solid #ddd",
-                  padding: "4px 6px",
-                  fontSize: "14px",
-                  lineHeight: "1.2"
+                  padding: "3px 6px",
+                  fontSize: "12px",
+                  lineHeight: "1.2",
+                  textAlign: "center"
                 }}
               >
                 {n.imageUrl && (
                   <img
                     src={n.imageUrl}
-                    style={{ width: "40px", height: "40px", objectFit: "cover", cursor: "pointer" }}
+                    style={{
+                      width: "40px",
+                      height: "40px",
+                      objectFit: "cover",
+                      borderRadius: "4px",
+                      cursor: "pointer"
+                    }}
                     onClick={() => {
                       setTargetNews(n)
                       setShowImageModal(true)
@@ -336,9 +355,12 @@ export default function Page() {
               <td
                 style={{
                   border: "1px solid #ddd",
-                  padding: "4px 6px",
-                  fontSize: "14px",
-                  lineHeight: "1.2"
+                  padding: "3px 6px",
+                  fontSize: "12px",
+                  lineHeight: "1.2",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis"
                 }}
               >
                 {n.title}
@@ -346,9 +368,12 @@ export default function Page() {
               <td
                 style={{
                   border: "1px solid #ddd",
-                  padding: "4px 6px",
-                  fontSize: "14px",
-                  lineHeight: "1.2"
+                  padding: "3px 6px",
+                  fontSize: "12px",
+                  lineHeight: "1.2",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap"
                 }}
               >
                 {n.body}
@@ -357,45 +382,74 @@ export default function Page() {
               <td
                 style={{
                   border: "1px solid #ddd",
-                  padding: "4px 6px",
-                  fontSize: "14px",
+                  padding: "3px 6px",
+                  fontSize: "12px",
                   lineHeight: "1.2"
                 }}
               >
-                {n.date ? new Date(n.date).toLocaleDateString() : ""}
+                {n.createdAt ? new Date(n.createdAt).toLocaleDateString() : ""}
               </td>
 
-              <td
-                style={{
-                  border: "1px solid #ddd",
-                  padding: "4px 6px",
-                  fontSize: "14px",
-                  lineHeight: "1.2",
-                  textAlign: "center"
-                }}
-              >
+              <td style={{ textAlign: "center", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>
                 <input
                   type="checkbox"
                   checked={n.isPublished}
-                  onChange={() => togglePublish(n)}
+                  disabled={updatingId === n.id}
+                  onChange={async (e) => {
+
+                    const value = e.target.checked
+
+                    setUpdatingId(n.id!)  // ← ロック開始
+
+                    const { error } = await supabase
+                      .from("news")
+                      .update({ "isPublished": value })
+                      .eq("id", n.id)
+
+                    console.log("update error:", error)
+
+                    if (error) {
+                      alert("更新失敗")
+                      setUpdatingId(null)
+                      return
+                    }
+
+                    setNews(news.map(item =>
+                      item.id === n.id
+                        ? { ...item, isPublished: value }
+                        : item
+                    ))
+
+                    setUpdatingId(null) // ← ロック解除
+                  }}
                 />
               </td>
 
               <td
                 style={{
                   border: "1px solid #ddd",
-                  padding: "4px 6px",
-                  fontSize: "14px",
+                  padding: "3px 6px",
+                  fontSize: "12px",
                   lineHeight: "1.2",
                   textAlign: "center"
                 }}
               >
-                <button onClick={() => {
-                  setEditNews({ ...n })
-                  setShowEdit(true)
-                }}>編集</button>
+                <button
+                  style={{ fontSize: "11px", marginRight: "4px" }}
+                  onClick={() => {
+                    setEditNews({ ...n })
+                    setShowEdit(true)
+                  }}
+                >
+                  編集
+                </button>
 
-                <button className="dangerText" onClick={() => deleteRow(n.id!)}>削除</button>
+                <button
+                  style={{ fontSize: "11px", color: "red" }}
+                  onClick={() => deleteRow(n.id!)}
+                >
+                  削除
+                </button>
               </td>
             </tr>
           ))}
@@ -532,8 +586,8 @@ export default function Page() {
               <button onClick={() => setShowEdit(false)}>
                 キャンセル
               </button>
-              <button onClick={saveEdit}>
-                保存
+              <button onClick={saveEdit} disabled={updatingId === editNews.id}>
+                {updatingId === editNews.id ? "保存中..." : "保存"}
               </button>
             </div>
           </div>
