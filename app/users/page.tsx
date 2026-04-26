@@ -12,14 +12,18 @@ type User = {
 
 export default function Users() {
   const [users, setUsers] = useState<User[]>([])
+  const [userData, setUserData] = useState<any>(null)
+  const isAdmin = userData?.role === "admin"
 
   const [showAdd, setShowAdd] = useState(false)
 
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
+    password: "",
     role: "staff"
   })
+  const [showPassword, setShowPassword] = useState(false)
 
   const [showEdit, setShowEdit] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
@@ -50,30 +54,62 @@ export default function Users() {
     }
 
     load()
+    loadUser()
   }, [])
+
+  const loadUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setTimeout(loadUser, 500)
+      return
+    }
+    const { data } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle()
+    setUserData(data)
+  }
 
   // -----------------------
   // add user
   // -----------------------
   const addUser = async () => {
-    if (!newUser.name || !newUser.email) {
+    if (!newUser.name || !newUser.email || !newUser.password) {
       alert("入力してください")
       return
     }
 
-    const { error } = await supabase.from("users").insert([
+    // ① Authに登録
+    const { data, error: authError } = await supabase.auth.signUp({
+      email: newUser.email,
+      password: newUser.password
+    })
+
+    if (authError) {
+      alert(authError.message)
+      return
+    }
+
+    const user = data.user
+    if (!user) return
+
+    // ② usersテーブルに登録
+    const { error: dbError } = await supabase.from("users").insert([
       {
+        id: user.id,
         name: newUser.name,
-        email: newUser.email,
+        email: user.email,
         role: newUser.role
       }
     ])
 
-    if (error) {
-      alert(error.message)
+    if (dbError) {
+      alert(dbError.message)
       return
     }
 
+    alert("ユーザー作成完了")
     setShowAdd(false)
     location.reload()
   }
@@ -200,13 +236,21 @@ export default function Users() {
                 </button>
 
                 <button
-                  onClick={() => deleteUser(u.id)}
+                  onClick={() => {
+                    if (!isAdmin) return
+                    deleteUser(u.id)
+                  }}
+                  disabled={!isAdmin}
                   style={{
-                    padding: "2px 8px",
+                    opacity: isAdmin ? 1 : 0.4,
+                    cursor: isAdmin ? "pointer" : "not-allowed",
+                    background: "#d9534f",
+                    color: "#fff",
+                    border: "none",
+                    padding: "6px 10px",
+                    borderRadius: "4px",
                     fontSize: "13px",
-                    marginLeft: "8px",
-                    color: "#d32f2f",
-                    cursor: "pointer"
+                    marginLeft: "8px"
                   }}
                 >
                   削除
@@ -272,6 +316,39 @@ export default function Users() {
               }
               style={{ width: "100%" }}
             />
+
+            <label style={{ display: "block", marginTop: "10px" }}>パスワード</label>
+            <div style={{ position: "relative", marginBottom: "16px" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={newUser.password}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, password: e.target.value })
+                }
+                style={{
+                  width: "100%",
+                  padding: "10px 40px 10px 10px", // 👈 右余白重要
+                  borderRadius: "6px",
+                  border: "1px solid #ccc",
+                  boxSizing: "border-box"
+                }}
+              />
+              <span
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute",
+                  right: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  cursor: "pointer",
+                  zIndex: 10,
+                  fontSize: "14px"
+                }}
+              >
+                {showPassword ? "🙈" : "👁"}
+              </span>
+            </div>
 
             <label>権限</label>
             <select
