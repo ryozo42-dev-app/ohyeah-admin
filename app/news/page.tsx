@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
 type News = {
-  id?: string
+  id?: number
   title: string
   body: string
   imageUrl?: string
@@ -16,8 +16,11 @@ type News = {
 export default function Page() {
 
   const [news, setNews] = useState<News[]>([])
-  const [selected, setSelected] = useState<string[]>([])
-  const [page, setPage] = useState(1)
+  const [userData, setUserData] = useState<any>(null)
+  const isAdmin = userData?.role === "admin"
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 8
 
   const [showAdd, setShowAdd] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
@@ -29,7 +32,7 @@ export default function Page() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [updatingId, setUpdatingId] = useState<number | null>(null)
 
   const [newNews, setNewNews] = useState({
     title: "",
@@ -43,8 +46,6 @@ export default function Page() {
 
   const [editImage, setEditImage] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
-
-  const perPage = 6
 
   /* -------------------------
   load
@@ -76,24 +77,42 @@ export default function Page() {
 
   useEffect(() => {
     load()
+    loadUser()
   }, [])
+
+  const loadUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setTimeout(loadUser, 500)
+      return
+    }
+    const { data } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle()
+    setUserData(data)
+  }
+
+  useEffect(() => {
+    setSelectedIds([])
+  }, [currentPage, news])
 
   /* -------------------------
   page
   ------------------------- */
 
-  const start = (page - 1) * perPage
-  const view = news.slice(start, start + perPage)
+  const start = (currentPage - 1) * itemsPerPage
+  const paginatedNews = news.slice(start, start + itemsPerPage)
 
-  const totalPage = Math.ceil(news.length / perPage)
-  const pages = Array.from({ length: totalPage }, (_, i) => i + 1)
+  const totalPages = Math.ceil(news.length / itemsPerPage)
 
   /* -------------------------
   checkbox
   ------------------------- */
 
-  const toggleSelect = (id: string) => {
-    setSelected(prev =>
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev =>
       prev.includes(id)
         ? prev.filter(n => n !== id)
         : [...prev, id]
@@ -104,7 +123,7 @@ export default function Page() {
   delete
   ------------------------- */
 
-  const deleteRow = async (id: string) => {
+  const deleteRow = async (id: number) => {
     if (!confirm("削除しますか？")) return
 
     await supabase.from("news").delete().eq("id", id)
@@ -112,15 +131,15 @@ export default function Page() {
   }
 
   const bulkDelete = async () => {
-    if (selected.length === 0) {
+    if (selectedIds.length === 0) {
       alert("ニュースを選択してください")
       return
     }
 
     if (!confirm("削除しますか？")) return
 
-    await supabase.from("news").delete().in("id", selected)
-    setSelected([])
+    await supabase.from("news").delete().in("id", selectedIds)
+    setSelectedIds([])
     await load()
   }
 
@@ -281,7 +300,11 @@ export default function Page() {
   ========================= */
 
   return (
-    <div style={{ padding: "20px 30px" }}>
+    <div style={{
+      padding: "20px 30px",
+      display: "flex",
+      flexDirection: "column"
+    }}>
 
       <h1 style={{ textAlign: "center", margin: "0 0 10px" }}>News管理システム</h1>
 
@@ -296,7 +319,19 @@ export default function Page() {
       >
         <thead>
           <tr style={{ background: "#ddd" }}>
-            <th style={{ width: "3%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}><input type="checkbox" /></th>
+            <th style={{ width: "3%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>
+              <input
+                type="checkbox"
+                checked={selectedIds.length === news.length && news.length > 0}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedIds(news.map(n => n.id as number))
+                  } else {
+                    setSelectedIds([])
+                  }
+                }}
+              />
+            </th>
             <th style={{ width: "7%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>画像</th>
             <th style={{ width: "23%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>タイトル</th>
             <th style={{ width: "42%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>本文</th>
@@ -307,8 +342,8 @@ export default function Page() {
         </thead>
 
         <tbody>
-          {view.map((n, i) => (
-            <tr key={n.id || i}>
+          {paginatedNews.map(n => (
+            <tr key={n.id}>
               <td
                 style={{
                   border: "1px solid #ddd",
@@ -320,8 +355,14 @@ export default function Page() {
               >
                 <input
                   type="checkbox"
-                  checked={selected.includes(n.id!)}
-                  onChange={() => toggleSelect(n.id!)}
+                  checked={selectedIds.includes(n.id as number)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedIds([...selectedIds, n.id as number])
+                    } else {
+                      setSelectedIds(selectedIds.filter(id => id !== n.id))
+                    }
+                  }}
                 />
               </td>
 
@@ -435,7 +476,7 @@ export default function Page() {
                 }}
               >
                 <button
-                  style={{ fontSize: "11px", marginRight: "4px" }}
+                  style={{ fontSize: "11px", marginRight: "6px" }}
                   onClick={() => {
                     setEditNews({ ...n })
                     setShowEdit(true)
@@ -445,8 +486,21 @@ export default function Page() {
                 </button>
 
                 <button
-                  style={{ fontSize: "11px", color: "red" }}
-                  onClick={() => deleteRow(n.id!)}
+                  onClick={() => {
+                    if (!isAdmin) return
+                    deleteRow(n.id!)
+                  }}
+                  disabled={!isAdmin}
+                  style={{
+                    opacity: isAdmin ? 1 : 0.4,
+                    cursor: isAdmin ? "pointer" : "not-allowed",
+                    background: "#d9534f",
+                    color: "#fff",
+                    border: "none",
+                    padding: "6px 10px",
+                    borderRadius: "4px",
+                    fontSize: "11px"
+                  }}
                 >
                   削除
                 </button>
@@ -456,25 +510,53 @@ export default function Page() {
         </tbody>
       </table>
 
-      <div style={{ marginTop: 10 }}>
-        選択 {selected.length} 件
-      </div>
+      {/* ページネーションと操作ボタン */}
+      <div style={{ marginTop: "20px" }}>
+        <div style={{ marginBottom: 10 }}>
+          選択 {selectedIds.length} 件
+        </div>
 
-      {/* ページ */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 15 }}>
-        <button onClick={() => page > 1 && setPage(page - 1)}>◀</button>
-        {pages.map(p => (
-          <button key={p} onClick={() => setPage(p)}>
-            {p}
+        {/* ページ */}
+        <div style={{ textAlign: "center", marginBottom: "20px" }}>
+          <button
+            onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+          >
+            ◀
           </button>
-        ))}
-        <button onClick={() => page < totalPage && setPage(page + 1)}>▶</button>
-      </div>
 
-      {/* 下ボタン */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 20 }}>
-        <button onClick={() => setShowAdd(true)}>ニュース投稿</button>
-        <button className="dangerText" onClick={bulkDelete}>一括削除</button>
+          <span style={{ margin: "0 10px" }}>
+            {currentPage} / {totalPages}
+          </span>
+
+          <button
+            onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+          >
+            ▶
+          </button>
+        </div>
+
+        {/* 下ボタン */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+          <button onClick={() => setShowAdd(true)}>ニュース投稿</button>
+          <button
+            onClick={() => {
+              if (!isAdmin) return
+              bulkDelete()
+            }}
+            disabled={!isAdmin}
+            style={{
+              opacity: isAdmin ? 1 : 0.4,
+              cursor: isAdmin ? "pointer" : "not-allowed",
+              background: "#d9534f",
+              color: "#fff",
+              border: "none",
+              padding: "6px 10px",
+              borderRadius: "4px"
+            }}
+          >
+            一括削除
+          </button>
+        </div>
       </div>
 
       {/* 新規投稿モーダル */}

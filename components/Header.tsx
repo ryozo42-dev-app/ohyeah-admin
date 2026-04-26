@@ -6,10 +6,12 @@ export default function Header() {
       style={{
         background: "#7b5a36",
         color: "#fff",
-        padding: "16px 20px",
+        height: "120px",
         display: "flex",
+        alignItems: "center",
         justifyContent: "center",
-        alignItems: "center"
+        fontSize: "32px",
+        paddingLeft: "200px"
       }}
     >
       <h2 style={{ margin: 0 }}>Oh Yeah！管理ツール</h2>

@@ -16,6 +16,8 @@ type Food = {
 
 export default function Foods() {
   const [foods, setFoods] = useState<Food[]>([])
+  const [userData, setUserData] = useState<any>(null)
+  const isAdmin = userData?.role === "admin"
   const [selected, setSelected] = useState<string[]>([])
   const [page, setPage] = useState(1)
   const [showEdit, setShowEdit] = useState(false)
@@ -138,7 +140,22 @@ export default function Foods() {
     }
 
     load()
+    loadUser()
   }, [])
+
+  const loadUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setTimeout(loadUser, 500)
+      return
+    }
+    const { data } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle()
+    setUserData(data)
+  }
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -548,13 +565,22 @@ export default function Foods() {
                 </button>
 
                 <button
-                  style={{
-                    fontSize: "11px",
-                    padding: "1px 6px",
-                    marginLeft: "2px",
-                    color: "#d32f2f"
+                  onClick={() => {
+                    if (!isAdmin) return
+                    deleteFood(f.id)
                   }}
-                  onClick={() => deleteFood(f.id)}
+                  disabled={!isAdmin}
+                  style={{
+                    opacity: isAdmin ? 1 : 0.4,
+                    cursor: isAdmin ? "pointer" : "not-allowed",
+                    background: "#d9534f",
+                    color: "#fff",
+                    border: "none",
+                    padding: "6px 10px",
+                    borderRadius: "4px",
+                    fontSize: "11px",
+                    marginLeft: "2px"
+                  }}
                 >
                   削除
                 </button>
@@ -634,8 +660,21 @@ export default function Foods() {
         </button>
 
         <button
-          style={{ fontSize: "12px", color: "#d32f2f" }}
-          onClick={bulkDelete}
+          onClick={() => {
+            if (!isAdmin) return
+            bulkDelete()
+          }}
+          disabled={!isAdmin}
+          style={{
+            opacity: isAdmin ? 1 : 0.4,
+            cursor: isAdmin ? "pointer" : "not-allowed",
+            background: "#d9534f",
+            color: "#fff",
+            border: "none",
+            padding: "6px 10px",
+            borderRadius: "4px",
+            fontSize: "12px"
+          }}
         >
           一括削除
         </button>
