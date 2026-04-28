@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
 type News = {
-  id?: number
+  id: number
   title: string
   body: string
   imageUrl?: string
@@ -18,8 +18,8 @@ export default function Page() {
   const [news, setNews] = useState<News[]>([])
   const [userData, setUserData] = useState<any>(null)
   const isAdmin = userData?.role === "admin"
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
-  const [currentPage, setCurrentPage] = useState(1)
+  const [selected, setSelected] = useState<number[]>([])
+  const [page, setPage] = useState(1)
   const itemsPerPage = 8
 
   const [showAdd, setShowAdd] = useState(false)
@@ -95,52 +95,95 @@ export default function Page() {
   }
 
   useEffect(() => {
-    setSelectedIds([])
-  }, [currentPage, news])
+    setSelected([])
+  }, [page, news])
 
   /* -------------------------
   page
   ------------------------- */
 
-  const start = (currentPage - 1) * itemsPerPage
+  const start = (page - 1) * itemsPerPage
   const paginatedNews = news.slice(start, start + itemsPerPage)
 
-  const totalPages = Math.ceil(news.length / itemsPerPage)
+  const totalPage = Math.ceil(news.length / itemsPerPage)
+
+  const toggleAll = () => {
+    const viewIds = paginatedNews.map(v => v.id)
+    const isAllSelected = viewIds.length > 0 && viewIds.every(id => selected.includes(id))
+
+    if (isAllSelected) {
+      setSelected(selected.filter(id => !viewIds.includes(id)))
+    } else {
+      setSelected(Array.from(new Set([...selected, ...viewIds])))
+    }
+  }
 
   /* -------------------------
   checkbox
   ------------------------- */
 
-  const toggleSelect = (id: number) => {
-    setSelectedIds(prev =>
-      prev.includes(id)
-        ? prev.filter(n => n !== id)
-        : [...prev, id]
-    )
+  const toggle = (id: number) => {
+    if (selected.includes(id)) {
+      setSelected(selected.filter(s => s !== id))
+    } else {
+      setSelected([...selected, id])
+    }
   }
 
   /* -------------------------
   delete
   ------------------------- */
 
-  const deleteRow = async (id: number) => {
-    if (!confirm("削除しますか？")) return
+  const handleDelete = async (id: number) => {
+    console.log("🔥 DELETE START - ID:", id, "Type:", typeof id)
 
-    await supabase.from("news").delete().eq("id", id)
-    await load()
-  }
+    const { data, error } = await supabase
+      .from("news")
+      .delete()
+      .eq("id", id)
+      .select()
 
-  const bulkDelete = async () => {
-    if (selectedIds.length === 0) {
-      alert("ニュースを選択してください")
+    console.log("DELETE RESULT DATA:", data)
+
+    if (error) {
+      console.error("DELETE ERROR:", error)
+      alert("削除失敗")
       return
     }
 
-    if (!confirm("削除しますか？")) return
+    if (!data || data.length === 0) {
+      console.warn("削除対象が見つかりませんでした。RLSポリシーまたはIDの型を確認してください。")
+    }
 
-    await supabase.from("news").delete().in("id", selectedIds)
-    setSelectedIds([])
-    await load()
+    load()
+  }
+
+  const bulkDelete = async () => {
+    if (selected.length === 0) {
+      alert("選択されていません")
+      return
+    }
+
+    if (!confirm(`${selected.length}件削除しますか？`)) return
+
+    console.log("🔥 BULK DELETE:", selected)
+
+    const { data, error } = await supabase
+      .from("news")
+      .delete()
+      .in("id", selected)
+      .select()
+
+    console.log("BULK DELETE RESULT DATA:", data)
+
+    if (error) {
+      console.error("BULK DELETE ERROR:", error)
+      alert("一括削除失敗")
+      return
+    }
+
+    load()
+    setSelected([])
   }
 
   /* -------------------------
@@ -257,8 +300,7 @@ export default function Page() {
       .update({ imageUrl })
       .eq("id", targetNews.id)
 
-    // UI更新
-    setNews(news.map(n => n.id === targetNews.id ? { ...n, imageUrl } : n))
+    load()
     setTargetNews({ ...targetNews, imageUrl })
     setUploading(false)
   }
@@ -287,10 +329,7 @@ export default function Page() {
       return
     }
 
-    setNews(news.map(n =>
-      n.id === editNews.id ? editNews : n
-    ))
-
+    load()
     setShowEdit(false)
     setUpdatingId(null)
   }
@@ -322,14 +361,8 @@ export default function Page() {
             <th style={{ width: "3%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>
               <input
                 type="checkbox"
-                checked={selectedIds.length === news.length && news.length > 0}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedIds(news.map(n => n.id as number))
-                  } else {
-                    setSelectedIds([])
-                  }
-                }}
+                checked={paginatedNews.length > 0 && paginatedNews.every(n => selected.includes(n.id))} // 全選択状態の表示
+                onChange={toggleAll}
               />
             </th>
             <th style={{ width: "7%", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>画像</th>
@@ -342,8 +375,8 @@ export default function Page() {
         </thead>
 
         <tbody>
-          {paginatedNews.map(n => (
-            <tr key={n.id}>
+          {paginatedNews.map((food) => (
+            <tr key={food.id}>
               <td
                 style={{
                   border: "1px solid #ddd",
@@ -355,14 +388,8 @@ export default function Page() {
               >
                 <input
                   type="checkbox"
-                  checked={selectedIds.includes(n.id as number)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedIds([...selectedIds, n.id as number])
-                    } else {
-                      setSelectedIds(selectedIds.filter(id => id !== n.id))
-                    }
-                  }}
+                  checked={selected.includes(food.id)}
+                  onChange={() => toggle(food.id)}
                 />
               </td>
 
@@ -375,9 +402,9 @@ export default function Page() {
                   textAlign: "center"
                 }}
               >
-                {n.imageUrl && (
+                {food.imageUrl && (
                   <img
-                    src={n.imageUrl}
+                    src={food.imageUrl}
                     style={{
                       width: "40px",
                       height: "40px",
@@ -386,7 +413,7 @@ export default function Page() {
                       cursor: "pointer"
                     }}
                     onClick={() => {
-                      setTargetNews(n)
+                      setTargetNews(food)
                       setShowImageModal(true)
                     }}
                   />
@@ -404,7 +431,7 @@ export default function Page() {
                   textOverflow: "ellipsis"
                 }}
               >
-                {n.title}
+                {food.title}
               </td>
               <td
                 style={{
@@ -417,7 +444,7 @@ export default function Page() {
                   whiteSpace: "nowrap"
                 }}
               >
-                {n.body}
+                {food.body}
               </td>
 
               <td
@@ -428,24 +455,24 @@ export default function Page() {
                   lineHeight: "1.2"
                 }}
               >
-                {n.createdAt ? new Date(n.createdAt).toLocaleDateString() : ""}
+                {food.createdAt ? new Date(food.createdAt).toLocaleDateString() : ""}
               </td>
 
               <td style={{ textAlign: "center", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>
                 <input
                   type="checkbox"
-                  checked={n.isPublished}
-                  disabled={updatingId === n.id}
+                  checked={food.isPublished}
+                  disabled={updatingId === food.id}
                   onChange={async (e) => {
 
                     const value = e.target.checked
 
-                    setUpdatingId(n.id!)  // ← ロック開始
+                    setUpdatingId(food.id!)  // ← ロック開始
 
                     const { error } = await supabase
                       .from("news")
                       .update({ "isPublished": value })
-                      .eq("id", n.id)
+                      .eq("id", food.id)
 
                     console.log("update error:", error)
 
@@ -456,7 +483,7 @@ export default function Page() {
                     }
 
                     setNews(news.map(item =>
-                      item.id === n.id
+                      item.id === food.id
                         ? { ...item, isPublished: value }
                         : item
                     ))
@@ -476,9 +503,9 @@ export default function Page() {
                 }}
               >
                 <button
-                  style={{ fontSize: "11px", marginRight: "6px" }}
+                  style={{ fontSize: "11px", padding: "1px 6px" }}
                   onClick={() => {
-                    setEditNews({ ...n })
+                    setEditNews({ ...food })
                     setShowEdit(true)
                   }}
                 >
@@ -486,20 +513,10 @@ export default function Page() {
                 </button>
 
                 <button
-                  onClick={() => {
-                    if (!isAdmin) return
-                    deleteRow(n.id!)
-                  }}
-                  disabled={!isAdmin}
-                  style={{
-                    opacity: isAdmin ? 1 : 0.4,
-                    cursor: isAdmin ? "pointer" : "not-allowed",
-                    background: "#d9534f",
-                    color: "#fff",
-                    border: "none",
-                    padding: "6px 10px",
-                    borderRadius: "4px",
-                    fontSize: "11px"
+                  style={{ fontSize: "11px", padding: "1px 6px", color: "red" }}
+                  onClick={async () => {
+                    if (!confirm("このニュースを削除しますか？")) return
+                    await handleDelete(food.id)
                   }}
                 >
                   削除
@@ -513,23 +530,55 @@ export default function Page() {
       {/* ページネーションと操作ボタン */}
       <div style={{ marginTop: "20px" }}>
         <div style={{ marginBottom: 10 }}>
-          選択 {selectedIds.length} 件
+          選択 {selected.length} 件
         </div>
 
         {/* ページ */}
-        <div style={{ textAlign: "center", marginBottom: "20px" }}>
+        <div style={{ marginTop: "10px", textAlign: "center" }}>
           <button
-            onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+            onClick={() => page > 1 && setPage(page - 1)}
+            style={{
+              margin: "0 3px",
+              background: "#fff",
+              color: "#000",
+              fontSize: "12px",
+              border: "1px solid #ccc",
+              padding: "4px 10px",
+              borderRadius: "4px"
+            }}
           >
             ◀
           </button>
 
-          <span style={{ margin: "0 10px" }}>
-            {currentPage} / {totalPages}
-          </span>
+          {Array.from({ length: totalPage }, (_, i) => i + 1).map(p => (
+            <button
+              key={p}
+              onClick={() => setPage(p)}
+              style={{
+                margin: "0 3px",
+                background: page === p ? "#7b5a36" : "#fff",
+                color: page === p ? "#fff" : "#000",
+                fontSize: "12px",
+                border: "1px solid #ccc",
+                padding: "4px 10px",
+                borderRadius: "4px"
+              }}
+            >
+              {p}
+            </button>
+          ))}
 
           <button
-            onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+            onClick={() => page < totalPage && setPage(page + 1)}
+            style={{
+              margin: "0 3px",
+              background: "#fff",
+              color: "#000",
+              fontSize: "12px",
+              border: "1px solid #ccc",
+              padding: "4px 10px",
+              borderRadius: "4px"
+            }}
           >
             ▶
           </button>
@@ -539,19 +588,16 @@ export default function Page() {
         <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
           <button onClick={() => setShowAdd(true)}>ニュース投稿</button>
           <button
-            onClick={() => {
+            onClick={async () => {
               if (!isAdmin) return
-              bulkDelete()
+              await bulkDelete()
             }}
             disabled={!isAdmin}
             style={{
               opacity: isAdmin ? 1 : 0.4,
               cursor: isAdmin ? "pointer" : "not-allowed",
-              background: "#d9534f",
-              color: "#fff",
-              border: "none",
-              padding: "6px 10px",
-              borderRadius: "4px"
+              fontSize: "12px",
+              color: "red"
             }}
           >
             一括削除

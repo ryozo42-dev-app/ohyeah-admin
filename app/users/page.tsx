@@ -37,22 +37,22 @@ export default function Users() {
   // -----------------------
   // load users
   // -----------------------
-  useEffect(() => {
-    const load = async () => {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .order("createdat", { ascending: false })
+  const load = async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .order("createdat", { ascending: false })
 
-      if (error) {
-        console.error(error)
-        alert("データ取得失敗")
-        return
-      }
-
-      setUsers(data || [])
+    if (error) {
+      console.error(error)
+      alert("データ取得失敗")
+      return
     }
 
+    setUsers(data || [])
+  }
+
+  useEffect(() => {
     load()
     loadUser()
   }, [])
@@ -111,7 +111,7 @@ export default function Users() {
 
     alert("ユーザー作成完了")
     setShowAdd(false)
-    location.reload()
+    load()
   }
 
   const updateUser = async () => {
@@ -126,16 +126,16 @@ export default function Users() {
       .eq("id", editingUser.id)
 
     if (error) {
-      alert(error.message)
+      console.error("UPDATE ERROR:", error)
       return
     }
 
     setShowEdit(false)
-    location.reload()
+    load()
   }
 
-  const deleteUser = async (id: string) => {
-    if (!confirm("削除しますか？")) return
+  const handleDelete = async (id: string) => {
+    console.log("🔥 DELETE:", id)
 
     const { error } = await supabase
       .from("users")
@@ -143,11 +143,11 @@ export default function Users() {
       .eq("id", id)
 
     if (error) {
-      alert(error.message)
+      console.error("DELETE ERROR:", error)
       return
     }
 
-    location.reload()
+    load()
   }
 
   // =====================
@@ -178,8 +178,8 @@ export default function Users() {
         </thead>
 
         <tbody>
-          {users.map((u) => (
-            <tr key={u.id}>
+          {users.map((food) => (
+            <tr key={food.id}>
               <td
                 style={{
                   border: "1px solid #ddd",
@@ -188,7 +188,7 @@ export default function Users() {
                   lineHeight: "1.2"
                 }}
               >
-                {u.name}
+                {food.name}
               </td>
 
               <td
@@ -199,7 +199,7 @@ export default function Users() {
                   lineHeight: "1.2"
                 }}
               >
-                {u.email}
+                {food.email}
               </td>
 
               <td
@@ -211,7 +211,7 @@ export default function Users() {
                   textAlign: "center"
                 }}
               >
-                {u.role}
+                {food.role}
               </td>
 
               <td
@@ -225,32 +225,21 @@ export default function Users() {
               >
                 <button
                   onClick={() => {
-                    setEditingUser(u)
-                    setEditName(u.name)
-                    setEditRole(u.role)
+                    setEditingUser(food)
+                    setEditName(food.name)
+                    setEditRole(food.role)
                     setShowEdit(true)
                   }}
-                  style={{ padding: "2px 8px", fontSize: "13px", cursor: "pointer" }}
+                  style={{ fontSize: "11px", padding: "1px 6px" }}
                 >
                   編集
                 </button>
 
                 <button
+                  style={{ fontSize: "11px", padding: "1px 6px", color: "red" }}
                   onClick={() => {
-                    if (!isAdmin) return
-                    deleteUser(u.id)
-                  }}
-                  disabled={!isAdmin}
-                  style={{
-                    opacity: isAdmin ? 1 : 0.4,
-                    cursor: isAdmin ? "pointer" : "not-allowed",
-                    background: "#d9534f",
-                    color: "#fff",
-                    border: "none",
-                    padding: "6px 10px",
-                    borderRadius: "4px",
-                    fontSize: "13px",
-                    marginLeft: "8px"
+                    if (!confirm("このユーザーを削除しますか？")) return
+                    handleDelete(food.id)
                   }}
                 >
                   削除
@@ -263,10 +252,7 @@ export default function Users() {
       <div style={{ textAlign: "center", marginTop: "30px" }}>
   <button
   onClick={() => setShowAdd(true)}
-  style={{
-    padding: "6px 16px",
-    cursor: "pointer"
-  }}
+  style={{ fontSize: "12px" }}
 >
   ユーザー追加
 </button>

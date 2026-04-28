@@ -3,9 +3,15 @@
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 
+type SliderImage = {
+  id: number
+  imageUrl: string
+  order: number
+}
+
 export default function Page() {
-  const [sliders, setSliders] = useState<any[]>([])
-  const [targetSlider, setTargetSlider] = useState<any>(null)
+  const [sliders, setSliders] = useState<SliderImage[]>([])
+  const [targetSlider, setTargetSlider] = useState<SliderImage | null>(null)
   const [showImageModal, setShowImageModal] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -21,68 +27,84 @@ export default function Page() {
       .select("*")
       .order("order", { ascending: true })
 
-    if (data) setSliders(data)
+    if (data) setSliders(data as SliderImage[])
   }
 
   const handleImageUpdate = async () => {
-    if (!selectedFile || !targetSlider) return
-
-    setUploading(true)
-
-    // 🔹 ② 新しい画像アップロード
-    const fileName = `${Date.now()}_${selectedFile.name}`
-
-    const { data: uploadData, error: uploadError } =
-      await supabase.storage
-        .from("images")
-        .upload(fileName, selectedFile, { upsert: true })
-
-    console.log("upload:", uploadData, uploadError)
-
-    if (uploadError) {
-      alert("アップロード失敗")
-      console.error(uploadError)
-      setUploading(false)
+    if (!selectedFile || !targetSlider) {
+      alert("画像を選択してください")
       return
     }
 
-    const { data } = supabase.storage
-      .from("images")
-      .getPublicUrl(fileName)
+    setUploading(true)
 
-    const imageUrl = data.publicUrl
-    console.log("new url:", imageUrl)
-
-    // 🔹 ③ DB更新
-    await supabase
-      .from("slider_images")
-      .update({ imageUrl })
-      .eq("id", targetSlider.id)
-
-    // 🔹 ④ 古い画像削除（ここが今回のポイント🔥）
     try {
-      const oldPath = targetSlider.imageUrl.split("/images/")[1]
 
-      console.log("削除対象:", oldPath)
+      // 画像アップロード
+      const fileName = `${Date.now()}_${selectedFile.name}`
 
-      if (oldPath) {
+      const { data: uploadData, error: uploadError } =
         await supabase.storage
           .from("images")
-          .remove([oldPath])
+          .upload(fileName, selectedFile, {
+            upsert: true
+          })
+
+      console.log("UPLOAD DATA:", uploadData)
+      console.log("UPLOAD ERROR:", uploadError)
+
+      if (uploadError) {
+        alert("アップロード失敗")
+        setUploading(false)
+        return
       }
 
+      // 公開URL取得
+      const { data: publicData } =
+        supabase.storage
+          .from("images")
+          .getPublicUrl(fileName)
+
+      const imageUrl = publicData.publicUrl
+
+      console.log("NEW URL:", imageUrl)
+
+      // DB更新
+      const { data: updateData, error: updateError } =
+        await supabase
+          .from("slider_images")
+          .update({
+            imageUrl: imageUrl
+          })
+          .eq("id", targetSlider.id)
+          .select()
+
+      console.log("UPDATE DATA:", updateData)
+      console.log("UPDATE ERROR:", updateError)
+
+      if (updateError) {
+        alert("DB更新失敗")
+        setUploading(false)
+        return
+      }
+
+      // 再取得
+      await load()
+
+      setShowImageModal(false)
+      setPreviewImage(null)
+      setSelectedFile(null)
+
     } catch (e) {
-      console.log("削除失敗", e)
+
+      console.error(e)
+      alert("更新失敗")
+
+    } finally {
+
+      setUploading(false)
+
     }
-
-    // UI更新
-    setSliders(sliders.map(s =>
-      s.id === targetSlider.id
-        ? { ...s, imageUrl }
-        : s
-    ))
-
-    setUploading(false)
   }
 
   return (
