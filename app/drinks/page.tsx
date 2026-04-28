@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
 type Drink = {
-  id: string
+  id: number
   name: string
   name_en: string
   drinkcategory: string
@@ -17,7 +17,7 @@ export default function Drinks() {
   const [drinks, setDrinks] = useState<Drink[]>([])
   const [userData, setUserData] = useState<any>(null)
   const isAdmin = userData?.role === "admin"
-  const [selected, setSelected] = useState<string[]>([])
+  const [selected, setSelected] = useState<number[]>([])
   const [page, setPage] = useState(1)
   const [showEdit, setShowEdit] = useState(false)
   const [editDrink, setEditDrink] = useState<Drink | null>(null)
@@ -40,19 +40,19 @@ export default function Drinks() {
 
   const perPage = 10
 
+  const load = async () => {
+    const { data, error } = await supabase
+      .from("menu_drinks")
+      .select("*")
+      .order("id", { ascending: true })
+
+    console.log("Drinks data:", data, "error:", error)
+    console.log(process.env.NEXT_PUBLIC_SUPABASE_URL)
+
+    setDrinks(data || [])
+  }
+
   useEffect(() => {
-    const load = async () => {
-      const { data, error } = await supabase
-        .from("menu_drinks")
-        .select("*")
-        .order("id", { ascending: true })
-
-      console.log("Drinks data:", data, "error:", error)
-      console.log(process.env.NEXT_PUBLIC_SUPABASE_URL)
-
-      setDrinks(data || [])
-    }
-
     load()
     loadUser()
   }, [])
@@ -92,7 +92,7 @@ export default function Drinks() {
   const view = drinks.slice(start, start + perPage)
   const totalPage = Math.ceil(drinks.length / perPage)
 
-  const toggle = (id: string) => {
+  const toggle = (id: number) => {
     if (selected.includes(id)) {
       setSelected(selected.filter(s => s !== id))
     } else {
@@ -127,18 +127,17 @@ export default function Drinks() {
       .eq("id", editDrink.id)
 
     if (error) {
-      alert("更新失敗")
+      console.error("UPDATE ERROR:", error)
+      alert(error.message)
       return
     }
 
-    // UI更新
-    setDrinks(drinks.map(d => (d.id === editDrink.id ? editDrink : d)))
-
+    load()
     setShowEdit(false)
   }
 
-  const deleteDrink = async (id: string) => {
-    if (!confirm("削除しますか？")) return
+  const handleDelete = async (id: number) => {
+    console.log("🔥 DELETE:", id)
 
     const { error } = await supabase
       .from("menu_drinks")
@@ -146,15 +145,12 @@ export default function Drinks() {
       .eq("id", id)
 
     if (error) {
-      alert("削除に失敗しました")
+      console.error("DELETE ERROR:", error)
+      alert(error.message)
       return
     }
 
-    // UI更新
-    setDrinks(drinks.filter(d => d.id !== id))
-
-    // 選択状態からも削除
-    setSelected(prev => prev.filter(s => s !== id))
+    load()
   }
 
   const addDrink = async () => {
@@ -178,14 +174,11 @@ export default function Drinks() {
       .select()
 
     if (error) {
-      alert("追加失敗")
+      console.error("INSERT ERROR:", error)
       return
     }
 
-    // UIに追加
-    if (data) {
-      setDrinks([...data, ...drinks])
-    }
+    load()
 
     // 初期化
     setNewDrink({
@@ -232,20 +225,19 @@ export default function Drinks() {
 
     if (!confirm(`${selected.length}件削除しますか？`)) return
 
+    console.log("🔥 BULK DELETE:", selected)
+
     const { error } = await supabase
       .from("menu_drinks")
       .delete()
       .in("id", selected)
 
     if (error) {
-      alert("削除失敗")
+      console.error("BULK DELETE ERROR:", error)
       return
     }
 
-    // UI更新
-    setDrinks(drinks.filter(d => !selected.includes(d.id)))
-
-    // 選択リセット
+    load()
     setSelected([])
   }
 
@@ -268,16 +260,12 @@ export default function Drinks() {
       .in("id", selected)
 
     if (error) {
-      alert("更新失敗")
+      console.error("UPDATE ERROR:", error)
+      alert(error.message)
       return
     }
 
-    // UI更新
-    setDrinks(drinks.map(d =>
-      selected.includes(d.id)
-        ? { ...d, price }
-        : d
-    ))
+    load()
 
     setSelected([])
     setShowPriceModal(false)
@@ -301,16 +289,12 @@ export default function Drinks() {
       .in("id", selected)
 
     if (error) {
-      alert("更新失敗")
+      console.error("UPDATE ERROR:", error)
+      alert(error.message)
       return
     }
 
-    // UI更新
-    setDrinks(drinks.map(d =>
-      selected.includes(d.id)
-        ? { ...d, drinkcategory: newCategory }
-        : d
-    ))
+    load()
 
     setSelected([])
     setShowCategoryModal(false)
@@ -390,30 +374,30 @@ export default function Drinks() {
         </thead>
 
         <tbody>
-          {view.map(d => (
+          {view.map(food => (
             <tr
-              key={d.id}
-              style={{ opacity: d.isactive ? 1 : 0.4 }}
+              key={food.id}
+              style={{ opacity: food.isactive ? 1 : 0.4 }}
             >
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
                 <input
                   type="checkbox"
-                  checked={selected.includes(d.id)}
-                  onChange={() => toggle(d.id)}
+                  checked={selected.includes(food.id)}
+                  onChange={() => toggle(food.id)}
                   style={{ transform: "scale(0.8)" }}
                 />
               </td>
 
               <td style={{ border: "1px solid #ddd", padding: "2px 4px", whiteSpace: "nowrap" }}>
-                {d.name}
+                {food.name}
               </td>
 
               <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
-                {d.name_en}
+                {food.name_en}
               </td>
 
               <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
-                {d.drinkcategory}
+                {food.drinkcategory}
               </td>
 
               {/* 👇 説明は広く＋省略なし */}
@@ -425,17 +409,17 @@ export default function Drinks() {
                   textAlign: "left"
                 }}
               >
-                {d.description || "-"}
+                {food.description || "-"}
               </td>
 
               <td style={{ border: "1px solid #ddd", padding: "2px 4px", textAlign: "right" }}>
-                ¥{d.price}
+                ¥{food.price}
               </td>
 
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
                 <input
                   type="checkbox"
-                  checked={d.isactive}
+                  checked={food.isactive}
                   onChange={async (e) => {
                     const checked = e.target.checked
 
@@ -443,7 +427,7 @@ export default function Drinks() {
                     const { error } = await supabase
                       .from("menu_drinks")
                       .update({ isactive: checked })
-                      .eq("id", d.id)
+                      .eq("id", food.id)
 
                     if (error) {
                       alert("更新失敗")
@@ -452,7 +436,7 @@ export default function Drinks() {
 
                     // UI更新（即反映）
                     setDrinks(drinks.map(x =>
-                      x.id === d.id ? { ...x, isactive: checked } : x
+                      x.id === food.id ? { ...x, isactive: checked } : x
                     ))
                   }}
                 />
@@ -472,7 +456,7 @@ export default function Drinks() {
                 <button
                   style={{ fontSize: "11px", padding: "1px 6px" }}
                   onClick={() => {
-                    setEditDrink(d)
+                    setEditDrink(food)
                     setShowEdit(true)
                   }}
                 >
@@ -480,21 +464,10 @@ export default function Drinks() {
                 </button>
 
                 <button
+                  style={{ fontSize: "11px", padding: "1px 6px", color: "red" }}
                   onClick={() => {
-                    if (!isAdmin) return
-                    deleteDrink(d.id)
-                  }}
-                  disabled={!isAdmin}
-                  style={{
-                    opacity: isAdmin ? 1 : 0.4,
-                    cursor: isAdmin ? "pointer" : "not-allowed",
-                    background: "#d9534f",
-                    color: "#fff",
-                    border: "none",
-                    padding: "6px 10px",
-                    borderRadius: "4px",
-                    fontSize: "11px",
-                    marginLeft: "2px"
+                    if (!confirm("このドリンクを削除しますか？")) return
+                    handleDelete(food.id)
                   }}
                 >
                   削除
@@ -579,12 +552,8 @@ export default function Drinks() {
           style={{
             opacity: isAdmin ? 1 : 0.4,
             cursor: isAdmin ? "pointer" : "not-allowed",
-            background: "#d9534f",
-            color: "#fff",
-            border: "none",
-            padding: "6px 10px",
-            borderRadius: "4px",
-            fontSize: "12px"
+            fontSize: "12px",
+            color: "red"
           }}
         >
           一括削除
