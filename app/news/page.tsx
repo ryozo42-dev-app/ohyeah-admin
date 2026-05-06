@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
+import { uploadImage } from "@/lib/uploadImage"
 
 type News = {
   id: number
@@ -211,29 +212,14 @@ export default function Page() {
 
     let imageUrl = ""
 
-    if (newImageFile) {
-      const fileName = `${Date.now()}_${newImageFile.name}`
-
-      const { error: uploadError } = await supabase.storage
-        .from("news-images")
-        .upload(fileName, newImageFile)
-
-      console.log("UPLOAD ERROR:", uploadError)
-
-      if (uploadError) {
-        alert("画像アップロード失敗")
-        return
+    try {
+      if (newImageFile) {
+        imageUrl = await uploadImage(newImageFile)
       }
-
-      const { data } = supabase.storage
-        .from("news-images")
-        .getPublicUrl(fileName)
-
-      console.log("PUBLIC URL:", data?.publicUrl)
-
-      imageUrl = data?.publicUrl || ""
-
-      console.log("FINAL imageUrl:", imageUrl)
+    } catch (err) {
+      console.error(err)
+      alert("画像アップロード失敗")
+      return
     }
 
     console.log("INSERT DATA:", {
@@ -274,35 +260,41 @@ export default function Page() {
 
     if (!targetNews) return
 
-    setUploading(true)
+    try {
 
-    const fileName = `${Date.now()}_${file.name}`
+      setUploading(true)
 
-    const { error: uploadError } = await supabase.storage
-      .from("news-images")
-      .upload(fileName, file)
+      const imageUrl = await uploadImage(file)
 
-    if (uploadError) {
-      alert("画像アップロード失敗")
-      console.error(uploadError)
+      const { error } = await supabase
+        .from("news")
+        .update({ imageUrl })
+        .eq("id", targetNews.id)
+
+      if (error) {
+        console.error(error)
+        alert("DB更新失敗")
+        setUploading(false)
+        return
+      }
+
+      await load()
+
+      setTargetNews({
+        ...targetNews,
+        imageUrl
+      })
+
+    } catch (err) {
+
+      console.error(err)
+      alert("画像変更失敗")
+
+    } finally {
+
       setUploading(false)
-      return
+
     }
-
-    const { data } = supabase.storage
-      .from("news-images")
-      .getPublicUrl(fileName)
-
-    const imageUrl = data.publicUrl
-
-    await supabase
-      .from("news")
-      .update({ imageUrl })
-      .eq("id", targetNews.id)
-
-    load()
-    setTargetNews({ ...targetNews, imageUrl })
-    setUploading(false)
   }
 
   /* -------------------------
@@ -314,24 +306,46 @@ export default function Page() {
 
     setUpdatingId(editNews.id)
 
-    const { error } = await supabase
-      .from("news")
-      .update({
-        title: editNews.title,
-        body: editNews.body,
-        isPublished: editNews.isPublished
-      })
-      .eq("id", editNews.id)
+    try {
+      let imageUrl = editNews.imageUrl || ""
 
-    if (error) {
+      // 新画像がある場合アップロード
+      if (editImage) {
+        imageUrl = await uploadImage(editImage)
+      }
+
+      const { error } = await supabase
+        .from("news")
+        .update({
+          title: editNews.title,
+          body: editNews.body,
+          imageUrl, // ここで更新されたimageUrlを使用
+          isPublished: editNews.isPublished
+        })
+        .eq("id", editNews.id)
+
+      if (error) {
+        console.error(error)
+        alert("更新失敗")
+        setUpdatingId(null)
+        return
+      }
+
+      await load()
+      setShowEdit(false)
+      setEditImage(null)
+      setPreview(null)
+
+    } catch (err) {
+
+      console.error(err)
+      alert("画像アップロード失敗")
+
+    } finally {
+
       setUpdatingId(null)
-      alert("更新失敗")
-      return
-    }
 
-    load()
-    setShowEdit(false)
-    setUpdatingId(null)
+    }
   }
 
   /* =========================
@@ -507,6 +521,8 @@ export default function Page() {
                   onClick={() => {
                     setEditNews({ ...food })
                     setShowEdit(true)
+                    setEditImage(null)
+                    setPreview(null)
                   }}
                 >
                   編集
@@ -608,65 +624,89 @@ export default function Page() {
       {/* 新規投稿モーダル */}
       {showAdd && (
         <div className="modalOverlay">
-          <div className="modalContent">
-            <h2 style={{ marginTop: 0 }}>ニュース新規投稿</h2>
-            <div className="modalField">
-              <label>タイトル</label>
-              <input
-                type="text"
-                value={newNews.title}
-                onChange={(e) => setNewNews({ ...newNews, title: e.target.value })}
-              />
-            </div>
-            <div className="modalField">
-              <label>本文</label>
-              <textarea
-                rows={5}
-                value={newNews.body}
-                onChange={(e) => setNewNews({ ...newNews, body: e.target.value })}
-              />
-            </div>
-
-            <div className="modalField">
-              <label style={{ marginTop: "10px" }}>画像</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  setNewImageFile(file)
-                  setPreviewAdd(URL.createObjectURL(file))
+          <div className="modalContent" style={{ padding: 0, overflow: "hidden" }}>
+            <div
+              style={{
+                height: "18px",
+                background: "#8B5E3C",
+              }}
+            />
+            <div style={{ padding: "0 20px 20px 20px" }}>
+              <h2
+                style={{
+                  textAlign: "center",
+                  marginBottom: "24px",
+                  marginTop: "20px"
                 }}
-              />
-              {previewAdd && (
-                <img
-                  src={previewAdd}
-                  style={{
-                    marginTop: "10px",
-                    width: "140px",
-                    height: "140px",
-                    objectFit: "cover",
-                    borderRadius: "8px",
-                    border: "1px solid #ccc"
+              >
+                ニュース新規投稿
+              </h2>
+              <div className="modalField">
+                <label>タイトル</label>
+                <input
+                  type="text"
+                  value={newNews.title}
+                  onChange={(e) => setNewNews({ ...newNews, title: e.target.value })}
+                />
+              </div>
+              <div className="modalField">
+                <label>本文</label>
+                <textarea
+                  rows={5}
+                  value={newNews.body}
+                  onChange={(e) => setNewNews({ ...newNews, body: e.target.value })}
+                />
+              </div>
+
+              <div className="modalField">
+                <label style={{ marginTop: "10px" }}>画像</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    setNewImageFile(file)
+                    setPreviewAdd(URL.createObjectURL(file))
                   }}
                 />
-              )}
-            </div>
+                {previewAdd && (
+                  <img
+                    src={previewAdd}
+                    style={{
+                      marginTop: "10px",
+                      width: "140px",
+                      height: "140px",
+                      objectFit: "cover",
+                      borderRadius: "8px",
+                      border: "1px solid #ccc"
+                    }}
+                  />
+                )}
+              </div>
 
-            <div className="modalField">
-              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={newNews.isPublished}
-                  onChange={(e) => setNewNews({ ...newNews, isPublished: e.target.checked })}
-                />
-                公開する
-              </label>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-              <button onClick={() => setShowAdd(false)}>キャンセル</button>
-              <button onClick={addNews}>投稿する</button>
+              <div className="modalField">
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={newNews.isPublished}
+                    onChange={(e) => setNewNews({ ...newNews, isPublished: e.target.checked })}
+                  />
+                  公開する
+                </label>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                <button
+                  onClick={() => {
+                    setShowAdd(false)
+                    setNewImageFile(null)
+                    setPreviewAdd(null)
+                  }}
+                >
+                  キャンセル
+                </button>
+                <button onClick={addNews}>投稿する</button>
+              </div>
             </div>
           </div>
         </div>
@@ -675,48 +715,115 @@ export default function Page() {
       {/* 編集モーダル */}
       {showEdit && editNews && (
         <div className="modalOverlay">
-          <div className="modalContent">
-            <h3 style={{ marginTop: 0 }}>ニュース編集</h3>
+          <div className="modalContent" style={{ padding: 0, overflow: "hidden" }}>
+            <div
+              style={{
+                height: "18px",
+                background: "#8B5E3C",
+              }}
+            />
+            <div style={{ padding: "0 20px 20px 20px" }}>
+              <h2
+                style={{
+                  textAlign: "center",
+                  marginBottom: "24px",
+                  marginTop: "20px"
+                }}
+              >
+                ニュース編集
+              </h2>
 
-            <div className="modalField">
-              <label>タイトル</label>
-              <input
-                type="text"
-                value={editNews.title}
-                onChange={(e) => setEditNews({ ...editNews, title: e.target.value })}
-              />
-            </div>
-
-            <div className="modalField">
-              <label>本文</label>
-              <textarea
-                rows={5}
-                value={editNews.body}
-                onChange={(e) => setEditNews({ ...editNews, body: e.target.value })}
-              />
-            </div>
-
-            <div className="modalField">
-              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <div className="modalField">
+                <label>タイトル</label>
                 <input
-                  type="checkbox"
-                  checked={editNews.isPublished}
-                  onChange={(e) => setEditNews({
-                    ...editNews,
-                    isPublished: e.target.checked
-                  })}
+                  type="text"
+                  value={editNews.title}
+                  onChange={(e) => setEditNews({ ...editNews, title: e.target.value })}
                 />
-                公開する
-              </label>
-            </div>
+              </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 20 }}>
-              <button onClick={() => setShowEdit(false)}>
-                キャンセル
-              </button>
-              <button onClick={saveEdit} disabled={updatingId === editNews.id}>
-                {updatingId === editNews.id ? "保存中..." : "保存"}
-              </button>
+              <div className="modalField">
+                <label>本文</label>
+                <textarea
+                  rows={5}
+                  value={editNews.body}
+                  onChange={(e) => setEditNews({ ...editNews, body: e.target.value })}
+                />
+              </div>
+
+              <div className="modalField">
+                <label style={{ marginTop: "10px" }}>画像</label>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    setEditImage(file)
+                    setPreview(URL.createObjectURL(file))
+                  }}
+                />
+
+                {/* 現在画像 */}
+                {!preview && editNews.imageUrl && (
+                  <img
+                    src={editNews.imageUrl}
+                    style={{
+                      marginTop: "10px",
+                      width: "140px",
+                      height: "140px",
+                      objectFit: "cover",
+                      borderRadius: "8px",
+                      border: "1px solid #ccc"
+                    }}
+                  />
+                )}
+
+                {/* 新プレビュー */}
+                {preview && (
+                  <img
+                    src={preview}
+                    style={{
+                      marginTop: "10px",
+                      width: "140px",
+                      height: "140px",
+                      objectFit: "cover",
+                      borderRadius: "8px",
+                      border: "1px solid #ccc"
+                    }}
+                  />
+                )}
+              </div>
+
+              <div className="modalField">
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={editNews.isPublished}
+                    onChange={(e) => setEditNews({
+                      ...editNews,
+                      isPublished: e.target.checked
+                    })}
+                  />
+                  公開する
+                </label>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 20 }}>
+                <button
+                  onClick={() => {
+                    setShowEdit(false)
+                    setEditImage(null)
+                    setPreview(null)
+                  }}
+                >
+                  キャンセル
+                </button>
+                <button onClick={saveEdit} disabled={updatingId === editNews.id}>
+                  {updatingId === editNews.id ? "保存中..." : "保存"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -738,83 +845,98 @@ export default function Page() {
         }}>
           <div style={{
             background: "#fff",
-            padding: "20px",
+            padding: 0,
+            overflow: "hidden",
             borderRadius: "8px",
             width: "400px",
             textAlign: "center"
           }}>
 
-            <h3>画像変更</h3>
-
-            <div style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: "20px"
-            }}>
-
-              {/* 現在 */}
-              <div>
-                <p>現在</p>
-                {targetNews.imageUrl ? (
-                  <img src={targetNews.imageUrl} style={{ width: "140px", height: "140px", objectFit: "cover", border: "1px solid #eee" }} alt="現在の画像" />
-                ) : (
-                  <div style={{ width: "140px", height: "140px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #ccc" }}>
-                    画像なし
-                  </div>
-                )}
-              </div>
-
-              {/* 変更後 */}
-              <div>
-                <p>変更後</p>
-                {previewImage ? (
-                  <img src={previewImage} style={{ width: "140px", height: "140px", objectFit: "cover", border: "1px solid #eee" }} alt="プレビュー画像" />
-                ) : (
-                  <div style={{ width: "140px", height: "140px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #ccc" }}>
-                    未選択
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                setSelectedFile(file)
-                setPreviewImage(URL.createObjectURL(file))
+            <div
+              style={{
+                height: "18px",
+                background: "#8B5E3C",
               }}
             />
+            <div style={{ padding: "20px" }}>
+              <h2
+                style={{
+                  textAlign: "center",
+                  marginBottom: "24px",
+                }}
+              >
+                画像変更
+              </h2>
 
-            {uploading && <p>アップロード中...</p>}
-
-            <div style={{ marginTop: "20px", display: "flex", justifyContent: "center", gap: "10px" }}>
-              <button onClick={() => {
-                setShowImageModal(false)
-                setPreviewImage(null)
-                setSelectedFile(null)
-                setTargetNews(null) // モーダルを閉じる際にtargetNewsもリセット
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "20px"
               }}>
-                キャンセル
-              </button>
 
-              <button onClick={async () => {
-                if (!selectedFile) {
-                  alert("画像を選択してください")
-                  return
-                }
-                await handleImageUpdate(selectedFile)
-                setShowImageModal(false)
-                setPreviewImage(null)
-                setSelectedFile(null)
-                setTargetNews(null) // モーダルを閉じる際にtargetNewsもリセット
-              }}>
-                変更
-              </button>
+                {/* 現在 */}
+                <div>
+                  <p>現在</p>
+                  {targetNews.imageUrl ? (
+                    <img src={targetNews.imageUrl} style={{ width: "140px", height: "140px", objectFit: "cover", border: "1px solid #eee" }} alt="現在の画像" />
+                  ) : (
+                    <div style={{ width: "140px", height: "140px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #ccc" }}>
+                      画像なし
+                    </div>
+                  )}
+                </div>
+
+                {/* 変更後 */}
+                <div>
+                  <p>変更後</p>
+                  {previewImage ? (
+                    <img src={previewImage} style={{ width: "140px", height: "140px", objectFit: "cover", border: "1px solid #eee" }} alt="プレビュー画像" />
+                  ) : (
+                    <div style={{ width: "140px", height: "140px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #ccc" }}>
+                      未選択
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  setSelectedFile(file)
+                  setPreviewImage(URL.createObjectURL(file))
+                }}
+              />
+
+              {uploading && <p>アップロード中...</p>}
+
+              <div style={{ marginTop: "20px", display: "flex", justifyContent: "center", gap: "10px" }}>
+                <button onClick={() => {
+                  setShowImageModal(false)
+                  setPreviewImage(null)
+                  setSelectedFile(null)
+                  setTargetNews(null)
+                }}>
+                  キャンセル
+                </button>
+
+                <button onClick={async () => {
+                  if (!selectedFile) {
+                    alert("画像を選択してください")
+                    return
+                  }
+                  await handleImageUpdate(selectedFile)
+                  setShowImageModal(false)
+                  setPreviewImage(null)
+                  setSelectedFile(null)
+                  setTargetNews(null)
+                }}>
+                  変更
+                </button>
+              </div>
             </div>
-
           </div>
         </div>
       )}

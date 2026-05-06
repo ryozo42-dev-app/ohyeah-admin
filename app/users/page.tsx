@@ -11,8 +11,10 @@ type User = {
 }
 
 export default function Users() {
+
   const [users, setUsers] = useState<User[]>([])
   const [userData, setUserData] = useState<any>(null)
+
   const isAdmin = userData?.role === "admin"
 
   const [showAdd, setShowAdd] = useState(false)
@@ -23,6 +25,7 @@ export default function Users() {
     password: "",
     role: "staff"
   })
+
   const [showPassword, setShowPassword] = useState(false)
 
   const [showEdit, setShowEdit] = useState(false)
@@ -31,17 +34,24 @@ export default function Users() {
   const [editName, setEditName] = useState("")
   const [editRole, setEditRole] = useState("staff")
 
+  const [loading, setLoading] = useState(false)
+
   const [page, setPage] = useState(1)
   const perPage = 10
 
   // -----------------------
   // load users
   // -----------------------
+
   const load = async () => {
+
     const { data, error } = await supabase
       .from("users")
       .select("*")
       .order("createdat", { ascending: false })
+
+    console.log("USERS:", data)
+    console.log("ERROR:", error)
 
     if (error) {
       console.error(error)
@@ -52,89 +62,166 @@ export default function Users() {
     setUsers(data || [])
   }
 
+  // -----------------------
+  // load login user
+  // -----------------------
+
+  const loadUser = async () => {
+
+    const {
+      data: { user }
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      setTimeout(loadUser, 500)
+      return
+    }
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle()
+
+    console.log("LOGIN USER:", data)
+    console.log("LOGIN ERROR:", error)
+
+    setUserData(data)
+  }
+
   useEffect(() => {
     load()
     loadUser()
   }, [])
 
-  const loadUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setTimeout(loadUser, 500)
-      return
-    }
-    const { data } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle()
-    setUserData(data)
-  }
-
   // -----------------------
   // add user
   // -----------------------
+
   const addUser = async () => {
+
     if (!newUser.name || !newUser.email || !newUser.password) {
       alert("入力してください")
       return
     }
 
-    // ① Authに登録
-    const { data, error: authError } = await supabase.auth.signUp({
-      email: newUser.email,
-      password: newUser.password
-    })
+    setLoading(true)
 
-    if (authError) {
-      alert(authError.message)
-      return
-    }
+    try {
 
-    const user = data.user
-    if (!user) return
+      // Auth登録
+      const { data, error: authError } = await supabase.auth.signUp({
+        email: newUser.email,
+        password: newUser.password
+      })
 
-    // ② usersテーブルに登録
-    const { error: dbError } = await supabase.from("users").insert([
-      {
-        id: user.id,
-        name: newUser.name,
-        email: user.email,
-        role: newUser.role
+      if (authError) {
+        alert(authError.message)
+        return
       }
-    ])
 
-    if (dbError) {
-      alert(dbError.message)
-      return
+      const user = data.user
+
+      if (!user) {
+        alert("ユーザー取得失敗")
+        return
+      }
+
+      // users table 登録
+      const { error: dbError } = await supabase
+        .from("users")
+        .insert([
+          {
+            id: user.id,
+            name: newUser.name,
+            email: user.email,
+            role: newUser.role,
+            createdat: new Date().toISOString()
+          }
+        ])
+
+      if (dbError) {
+        console.error(dbError)
+        alert(dbError.message)
+        return
+      }
+
+      alert("ユーザー作成完了")
+
+      setShowAdd(false)
+
+      setNewUser({
+        name: "",
+        email: "",
+        password: "",
+        role: "staff"
+      })
+
+      await load()
+
+    } catch (err) {
+
+      console.error(err)
+
+      alert("登録に失敗しました")
+
+    } finally {
+
+      setLoading(false)
+
     }
-
-    alert("ユーザー作成完了")
-    setShowAdd(false)
-    load()
   }
+
+  // -----------------------
+  // update user
+  // -----------------------
 
   const updateUser = async () => {
+
     if (!editingUser) return
 
-    const { error } = await supabase
-      .from("users")
-      .update({
-        name: editName,
-        role: editRole
-      })
-      .eq("id", editingUser.id)
+    setLoading(true)
 
-    if (error) {
-      console.error("UPDATE ERROR:", error)
-      return
+    try {
+
+      const { error } = await supabase
+        .from("users")
+        .update({
+          name: editName,
+          role: editRole
+        })
+        .eq("id", editingUser.id)
+
+      if (error) {
+
+        console.error("UPDATE ERROR:", error)
+
+        alert("更新に失敗しました")
+
+        return
+      }
+
+      setShowEdit(false)
+
+      await load()
+
+    } catch (err) {
+
+      console.error(err)
+
+    } finally {
+
+      setLoading(false)
+
     }
-
-    setShowEdit(false)
-    load()
   }
 
+  // -----------------------
+  // delete
+  // -----------------------
+
   const handleDelete = async (id: string) => {
+
     console.log("🔥 DELETE:", id)
 
     const { error } = await supabase
@@ -143,21 +230,38 @@ export default function Users() {
       .eq("id", id)
 
     if (error) {
+
       console.error("DELETE ERROR:", error)
+
+      alert("削除失敗")
+
       return
     }
 
-    load()
+    await load()
   }
+
+  // -----------------------
+  // pagination
+  // -----------------------
+
+  const start = (page - 1) * perPage
+
+  const paginatedUsers = users.slice(start, start + perPage)
+
+  const totalPage = Math.ceil(users.length / perPage)
 
   // =====================
   // UI
   // =====================
-  return (
-    <div style={{ padding: "20px 30px" }}>
-      <h1 style={{ textAlign: "center", margin: "0 0 10px" }}>Users管理</h1>
 
-      
+  return (
+
+    <div style={{ padding: "20px 30px" }}>
+
+      <h1 style={{ textAlign: "center", margin: "0 0 10px" }}>
+        Users管理
+      </h1>
 
       <table
         style={{
@@ -168,18 +272,33 @@ export default function Users() {
           tableLayout: "fixed"
         }}
       >
+
         <thead>
           <tr style={{ background: "#ddd" }}>
-            <th style={{ width: "180px", border: "1px solid #ccc" }}>名前</th>
-            <th style={{ width: "280px", border: "1px solid #ccc" }}>メール</th>
-            <th style={{ width: "120px", border: "1px solid #ccc" }}>権限</th>
-            <th style={{ width: "180px", border: "1px solid #ccc" }}>操作</th>
+            <th style={{ width: "180px", border: "1px solid #ccc" }}>
+              名前
+            </th>
+
+            <th style={{ width: "280px", border: "1px solid #ccc" }}>
+              メール
+            </th>
+
+            <th style={{ width: "120px", border: "1px solid #ccc" }}>
+              権限
+            </th>
+
+            <th style={{ width: "180px", border: "1px solid #ccc" }}>
+              操作
+            </th>
           </tr>
         </thead>
 
         <tbody>
-          {users.map((food) => (
-            <tr key={food.id}>
+
+          {paginatedUsers.map((user) => (
+
+            <tr key={user.id}>
+
               <td
                 style={{
                   border: "1px solid #ddd",
@@ -188,7 +307,7 @@ export default function Users() {
                   lineHeight: "1.2"
                 }}
               >
-                {food.name}
+                {user.name}
               </td>
 
               <td
@@ -199,7 +318,7 @@ export default function Users() {
                   lineHeight: "1.2"
                 }}
               >
-                {food.email}
+                {user.email}
               </td>
 
               <td
@@ -211,7 +330,7 @@ export default function Users() {
                   textAlign: "center"
                 }}
               >
-                {food.role}
+                {user.role}
               </td>
 
               <td
@@ -223,43 +342,113 @@ export default function Users() {
                   textAlign: "center"
                 }}
               >
+
                 <button
                   onClick={() => {
-                    setEditingUser(food)
-                    setEditName(food.name)
-                    setEditRole(food.role)
+
+                    setEditingUser(user)
+
+                    setEditName(user.name)
+
+                    setEditRole(user.role)
+
                     setShowEdit(true)
                   }}
-                  style={{ fontSize: "11px", padding: "1px 6px" }}
+                  style={{
+                    fontSize: "11px",
+                    padding: "1px 6px"
+                  }}
                 >
                   編集
                 </button>
 
                 <button
-                  style={{ fontSize: "11px", padding: "1px 6px", color: "red" }}
+                  style={{
+                    fontSize: "11px",
+                    padding: "1px 6px",
+                    color: "red"
+                  }}
                   onClick={() => {
+
                     if (!confirm("このユーザーを削除しますか？")) return
-                    handleDelete(food.id)
+
+                    handleDelete(user.id)
                   }}
                 >
                   削除
                 </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div style={{ textAlign: "center", marginTop: "30px" }}>
-  <button
-  onClick={() => setShowAdd(true)}
-  style={{ fontSize: "12px" }}
->
-  ユーザー追加
-</button>
-</div>
 
-      {/* モーダル */}
+              </td>
+
+            </tr>
+
+          ))}
+
+        </tbody>
+
+      </table>
+
+      {/* pagination */}
+
+      <div
+        style={{
+          marginTop: "20px",
+          textAlign: "center"
+        }}
+      >
+
+        <button
+          disabled={page === 1}
+          onClick={() => setPage(page - 1)}
+          style={{ marginRight: "8px" }}
+        >
+          ◀
+        </button>
+
+        {Array.from({ length: totalPage }, (_, i) => i + 1).map((p) => (
+          <button
+            key={p}
+            onClick={() => setPage(p)}
+            style={{
+              margin: "0 4px",
+              background: page === p ? "#8B5E3C" : "#fff",
+              color: page === p ? "#fff" : "#000",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              padding: "4px 10px"
+            }}
+          >
+            {p}
+          </button>
+        ))}
+
+        <button
+          disabled={page === totalPage}
+          onClick={() => setPage(page + 1)}
+          style={{ marginLeft: "8px" }}
+        >
+          ▶
+        </button>
+
+      </div>
+
+      {/* add button */}
+
+      <div style={{ textAlign: "center", marginTop: "30px" }}>
+
+        <button
+          onClick={() => setShowAdd(true)}
+          style={{ fontSize: "12px" }}
+        >
+          ユーザー追加
+        </button>
+
+      </div>
+
+      {/* ADD MODAL */}
+
       {showAdd && (
+
         <div
           style={{
             position: "fixed",
@@ -274,109 +463,179 @@ export default function Users() {
           }}
           onClick={() => setShowAdd(false)}
         >
+
           <div
             style={{
               background: "#fff",
-              padding: "25px",
               borderRadius: "8px",
-              width: "400px"
+              width: "400px",
+              padding: 0,
+              overflow: "hidden"
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3>ユーザー追加</h3>
-
-            <label>名前</label>
-            <input
-              value={newUser.name}
-              onChange={(e) =>
-                setNewUser({ ...newUser, name: e.target.value })
-              }
-              style={{ width: "100%" }}
-            />
-
-            <label>メール</label>
-            <input
-              value={newUser.email}
-              onChange={(e) =>
-                setNewUser({ ...newUser, email: e.target.value })
-              }
-              style={{ width: "100%" }}
-            />
-
-            <label style={{ display: "block", marginTop: "10px" }}>パスワード</label>
-            <div style={{ position: "relative", marginBottom: "16px" }}>
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                value={newUser.password}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, password: e.target.value })
-                }
-                style={{
-                  width: "100%",
-                  padding: "10px 40px 10px 10px", // 👈 右余白重要
-                  borderRadius: "6px",
-                  border: "1px solid #ccc",
-                  boxSizing: "border-box"
-                }}
-              />
-              <span
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: "absolute",
-                  right: "10px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  cursor: "pointer",
-                  zIndex: 10,
-                  fontSize: "14px"
-                }}
-              >
-                {showPassword ? "🙈" : "👁"}
-              </span>
-            </div>
-
-            <label>権限</label>
-            <select
-              value={newUser.role}
-              onChange={(e) =>
-                setNewUser({ ...newUser, role: e.target.value })
-              }
-              style={{ width: "100%" }}
-            >
-              <option value="admin">admin</option>
-              <option value="staff">staff</option>
-            </select>
 
             <div
               style={{
-                marginTop: "20px",
-                display: "flex",
-                justifyContent: "space-between"
+                height: "18px",
+                background: "#8B5E3C",
               }}
-            >
-              <button onClick={() => setShowAdd(false)} style={{ padding: "2px 8px", fontSize: "13px", cursor: "pointer" }}>
-                キャンセル
-              </button>
+            />
 
-              <button
-                onClick={addUser}
+            <div style={{ padding: "0 20px 20px 20px" }}>
+
+              <h2
                 style={{
-                  background: "#7b5a36",
-                  color: "#fff",
-                padding: "2px 8px",
-                fontSize: "13px",
-                cursor: "pointer"
+                  textAlign: "center",
+                  marginBottom: "24px",
+                  marginTop: "20px"
                 }}
               >
-                登録
-              </button>
+                ユーザー追加
+              </h2>
+
+              <label>名前</label>
+
+              <input
+                value={newUser.name}
+                onChange={(e) =>
+                  setNewUser({
+                    ...newUser,
+                    name: e.target.value
+                  })
+                }
+                style={{
+                  width: "100%",
+                  marginBottom: "10px"
+                }}
+              />
+
+              <label>メール</label>
+
+              <input
+                value={newUser.email}
+                onChange={(e) =>
+                  setNewUser({
+                    ...newUser,
+                    email: e.target.value
+                  })
+                }
+                style={{
+                  width: "100%",
+                  marginBottom: "10px"
+                }}
+              />
+
+              <label
+                style={{
+                  display: "block",
+                  marginTop: "10px"
+                }}
+              >
+                パスワード
+              </label>
+
+              <div
+                style={{
+                  position: "relative",
+                  marginBottom: "16px"
+                }}
+              >
+
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  value={newUser.password}
+                  onChange={(e) =>
+                    setNewUser({
+                      ...newUser,
+                      password: e.target.value
+                    })
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "10px 40px 10px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid #ccc",
+                    boxSizing: "border-box"
+                  }}
+                />
+
+                <span
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: "absolute",
+                    right: "10px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    cursor: "pointer",
+                    zIndex: 10,
+                    fontSize: "14px"
+                  }}
+                >
+                  {showPassword ? "🙈" : "👁"}
+                </span>
+
+              </div>
+
+              <label>権限</label>
+
+              <select
+                value={newUser.role}
+                onChange={(e) =>
+                  setNewUser({
+                    ...newUser,
+                    role: e.target.value
+                  })
+                }
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "4px",
+                  border: "1px solid #ccc"
+                }}
+              >
+                <option value="admin">admin</option>
+                <option value="staff">staff</option>
+              </select>
+
+              <div
+                style={{
+                  marginTop: "20px",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "10px"
+                }}
+              >
+
+                <button
+                  disabled={loading}
+                  onClick={() => setShowAdd(false)}
+                >
+                  キャンセル
+                </button>
+
+                <button
+                  disabled={loading}
+                  onClick={addUser}
+                >
+                  {loading ? "登録中..." : "登録"}
+                </button>
+
+              </div>
+
             </div>
+
           </div>
+
         </div>
+
       )}
 
+      {/* EDIT MODAL */}
+
       {showEdit && (
+
         <div
           style={{
             position: "fixed",
@@ -391,52 +650,97 @@ export default function Users() {
           }}
           onClick={() => setShowEdit(false)}
         >
+
           <div
             style={{
               background: "#fff",
-              padding: "25px",
               borderRadius: "8px",
-              width: "400px"
+              width: "400px",
+              padding: 0,
+              overflow: "hidden"
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3>ユーザー編集</h3>
-
-            <label>名前</label>
-            <input
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              style={{ width: "100%" }}
-            />
-
-            <label>権限</label>
-            <select
-              value={editRole}
-              onChange={(e) => setEditRole(e.target.value)}
-              style={{ width: "100%" }}
-            >
-              <option value="admin">admin</option>
-              <option value="staff">staff</option>
-            </select>
 
             <div
               style={{
-                marginTop: "20px",
-                display: "flex",
-                justifyContent: "space-between"
+                height: "18px",
+                background: "#8B5E3C",
               }}
-            >
-              <button onClick={() => setShowEdit(false)} style={{ padding: "2px 8px", fontSize: "13px", cursor: "pointer" }}>
-                キャンセル
-              </button>
+            />
 
-              <button onClick={updateUser} style={{ padding: "2px 8px", fontSize: "13px", cursor: "pointer" }}>
-                保存
-              </button>
+            <div style={{ padding: "0 20px 20px 20px" }}>
+
+              <h2
+                style={{
+                  textAlign: "center",
+                  marginBottom: "24px",
+                  marginTop: "20px"
+                }}
+              >
+                ユーザー編集
+              </h2>
+
+              <label>名前</label>
+
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                style={{
+                  width: "100%",
+                  marginBottom: "10px"
+                }}
+              />
+
+              <label>権限</label>
+
+              <select
+                value={editRole}
+                onChange={(e) => setEditRole(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "4px",
+                  border: "1px solid #ccc"
+                }}
+              >
+                <option value="admin">admin</option>
+                <option value="staff">staff</option>
+              </select>
+
+              <div
+                style={{
+                  marginTop: "20px",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "10px"
+                }}
+              >
+
+                <button
+                  disabled={loading}
+                  onClick={() => setShowEdit(false)}
+                >
+                  キャンセル
+                </button>
+
+                <button
+                  disabled={loading}
+                  onClick={updateUser}
+                >
+                  {loading ? "保存中..." : "保存"}
+                </button>
+
+              </div>
+
             </div>
+
           </div>
+
         </div>
+
       )}
+
     </div>
   )
 }

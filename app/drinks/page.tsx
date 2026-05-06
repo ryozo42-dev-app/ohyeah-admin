@@ -24,6 +24,8 @@ export default function Drinks() {
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
   const [categories, setCategories] = useState<string[]>([])
+  const [selectedFilterCategory, setSelectedFilterCategory] = useState<string | null>(null);
+  const [selectedFilterPrice, setSelectedFilterPrice] = useState<string | null>(null);
   const [showPriceModal, setShowPriceModal] = useState(false)
   const [newPrice, setNewPrice] = useState("")
   const [showCategoryModal, setShowCategoryModal] = useState(false)
@@ -41,21 +43,78 @@ export default function Drinks() {
   const perPage = 10
 
   const load = async () => {
-    const { data, error } = await supabase
-      .from("menu_drinks")
-      .select("*")
-      .order("id", { ascending: true })
+    let query = supabase.from("menu_drinks").select("*");
 
-    console.log("Drinks data:", data, "error:", error)
-    console.log(process.env.NEXT_PUBLIC_SUPABASE_URL)
+    // カテゴリーフィルターを適用
+    if (selectedFilterCategory) {
+      query = query.eq("drinkcategory", selectedFilterCategory);
+    }
 
-    setDrinks(data || [])
+    // 価格帯フィルターを適用
+    if (selectedFilterPrice) {
+      const [minStr, maxStr] = selectedFilterPrice.split('-');
+      const minPrice = parseInt(minStr);
+      if (!isNaN(minPrice)) query = query.gte("price", minPrice);
+      if (maxStr && maxStr !== '+') {
+        const maxPrice = parseInt(maxStr);
+        if (!isNaN(maxPrice)) query = query.lte("price", maxPrice);
+      }
+    }
+
+    const { data, error } = await query; // フィルター適用後のクエリを実行
+
+    if (error) {
+      console.error("Drinks load error:", error)
+      return
+    }
+
+    if (data) {
+      const priorityOrder = [
+        "BEER",
+        "BEER_COCKTAIL",
+        "COCKTAIL",
+        "BOMB",
+        "WINE",
+        "AWAMORI",
+        "NON_ALCHOL",
+        "SOFT_DRINK",
+      ]
+
+      const sortedData = [...data].sort((a, b) => {
+        // ① カテゴリー（drinkcategory）のソート
+        const idxA = priorityOrder.indexOf(a.drinkcategory)
+        const idxB = priorityOrder.indexOf(b.drinkcategory)
+
+        let catComp = 0
+        if (idxA !== -1 && idxB !== -1) {
+          catComp = idxA - idxB
+        } else if (idxA !== -1) {
+          catComp = -1
+        } else if (idxB !== -1) {
+          catComp = 1
+        } else {
+          catComp = a.drinkcategory.localeCompare(b.drinkcategory)
+        }
+
+        if (catComp !== 0) return catComp
+
+        // ② 名前（name）のソート
+        const nameComp = a.name.localeCompare(b.name);
+        if (nameComp !== 0) return nameComp;
+
+        // ③ 価格（price）のソート
+        return a.price - b.price;
+      });
+      setDrinks(sortedData);
+    } else {
+      setDrinks([]);
+    }
   }
 
   useEffect(() => {
     load()
     loadUser()
-  }, [])
+  }, [selectedFilterCategory, selectedFilterPrice]); // フィルター状態が変更されたら再フェッチ
 
   const loadUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -342,6 +401,43 @@ export default function Drinks() {
       <h1 style={{ textAlign: "center", margin: "0 0 10px", fontSize: "35px" }}>
         Drink管理
       </h1>
+
+      {/* フィルターUI */}
+      <div style={{ display: "flex", gap: "10px", marginBottom: "15px", flexWrap: "wrap" }}>
+        {/* カテゴリーフィルター */}
+        <div>
+          <label htmlFor="drinkCategoryFilter" style={{ marginRight: "5px" }}>カテゴリー:</label>
+          <select
+            id="drinkCategoryFilter"
+            value={selectedFilterCategory || ""}
+            onChange={(e) => setSelectedFilterCategory(e.target.value || null)}
+            style={{ padding: "5px", borderRadius: "4px", border: "1px solid #ccc" }}
+          >
+            <option value="">全て</option>
+            {categories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* 価格帯フィルター */}
+        <div>
+          <label htmlFor="drinkPriceFilter" style={{ marginRight: "5px" }}>価格帯:</label>
+          <select
+            id="drinkPriceFilter"
+            value={selectedFilterPrice || ""}
+            onChange={(e) => setSelectedFilterPrice(e.target.value || null)}
+            style={{ padding: "5px", borderRadius: "4px", border: "1px solid #ccc" }}
+          >
+            <option value="">全て</option>
+            <option value="0-500">¥0 - ¥500</option>
+            <option value="501-1000">¥501 - ¥1,000</option>
+            <option value="1001-2000">¥1,001 - ¥2,000</option>
+            <option value="2001+">¥2,001 以上</option>
+          </select>
+        </div>
+      </div>
+
       {/* 画面表示用エリア（ページネーション・ボタン・操作用テーブル） */}
       <div className="no-print">
         <table

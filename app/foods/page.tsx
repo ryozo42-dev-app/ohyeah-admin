@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
+import { uploadImage } from "@/lib/uploadImage" // uploadImageユーティリティは引き続き使用
 
 type Food = {
   id: string
@@ -25,6 +26,8 @@ export default function Foods() {
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
   const [categories, setCategories] = useState<string[]>([])
+  const [selectedFilterCategory, setSelectedFilterCategory] = useState<string | null>(null);
+  const [selectedFilterPrice, setSelectedFilterPrice] = useState<string | null>(null);
   const [showPriceModal, setShowPriceModal] = useState(false)
   const [newPrice, setNewPrice] = useState("")
   const [showCategoryModal, setShowCategoryModal] = useState(false)
@@ -45,102 +48,81 @@ export default function Foods() {
     isactive: true
   })
 
-  const handleImageUpload = async (file: File) => {
-    setUploading(true)
-
-    const fileName = `${Date.now()}_${file.name}`
-
-    const { error: uploadError } = await supabase.storage
-      .from("food-images")
-      .upload(fileName, file)
-
-    if (uploadError) {
-      alert("アップロード失敗")
-      setUploading(false)
-      return
-    }
-
-    const { data } = supabase.storage
-      .from("food-images")
-      .getPublicUrl(fileName)
-
-    if (!data?.publicUrl) {
-      alert("URL取得失敗")
-      setUploading(false)
-      return
-    }
-
-    if (showEdit && editFood) {
-      setEditFood({ ...editFood, image_url: data.publicUrl })
-    } else {
-      setNewFood({ ...newFood, image_url: data.publicUrl })
-    }
-
-    setUploading(false)
-  }
-
-  const handleImageUpdate = async (file: File) => {
-    if (!targetFood) return
-
-    setUploading(true)
-
-    const fileName = `${Date.now()}_${file.name}`
-
-    const { error } = await supabase.storage
-      .from("food-images")
-      .upload(fileName, file)
-
-    if (error) {
-      alert("アップロード失敗")
-      setUploading(false)
-      return
-    }
-
-    const { data } = supabase.storage
-      .from("food-images")
-      .getPublicUrl(fileName)
-
-    const image_url = data.publicUrl
-
-    // DB更新
-    const { error: updateError } = await supabase
-      .from("menu_foods")
-      .update({ image_url })
-      .eq("id", targetFood.id)
-
-    if (updateError) {
-      alert("更新失敗")
-      setUploading(false)
-      return
-    }
-
-    // 再取得（不整合防止のため重要）
-    fetchFoods()
-
-    setTargetFood({ ...targetFood, image_url })
-    setShowImageModal(false) // 更新成功時にモーダルを閉じる
-    setUploading(false)
-  }
-
   const perPage = 6
 
   const fetchFoods = async () => {
-    const { data, error } = await supabase
-      .from("menu_foods")
-      .select("*")
-      .order("id", { ascending: true })
+    let query = supabase.from("menu_foods").select("*");
+
+    // カテゴリーフィルターを適用
+    if (selectedFilterCategory) {
+      query = query.eq("foodcategory", selectedFilterCategory);
+    }
+
+    // 価格帯フィルターを適用
+    if (selectedFilterPrice) {
+      const [minStr, maxStr] = selectedFilterPrice.split('-');
+      const minPrice = parseInt(minStr);
+      if (!isNaN(minPrice)) query = query.gte("price", minPrice);
+      if (maxStr && maxStr !== '+') {
+        const maxPrice = parseInt(maxStr);
+        if (!isNaN(maxPrice)) query = query.lte("price", maxPrice);
+      }
+    }
+
+    const { data, error } = await query; // フィルター適用後のクエリを実行
 
     if (error) {
       console.error("FETCH ERROR:", error)
       return
     }
-    setFoods(data || [])
+
+    if (data) {
+      // 指定された特定のカテゴリー順序
+      const priorityOrder = ["PIZZA", "FRIDE", "OHTER"];
+
+      const sortedData = [...data].sort((a, b) => {
+        // ① カテゴリー（foodcategory）のソート
+        const idxA = priorityOrder.indexOf(a.foodcategory);
+        const idxB = priorityOrder.indexOf(b.foodcategory);
+
+        let catComp = 0;
+        if (idxA !== -1 && idxB !== -1) {
+          catComp = idxA - idxB;
+        } else if (idxA !== -1) {
+          catComp = -1;
+        } else if (idxB !== -1) {
+          catComp = 1;
+        } else {
+          catComp = a.foodcategory.localeCompare(b.foodcategory);
+        }
+
+        if (catComp !== 0) return catComp;
+
+        // ② 名前（name）のソート
+        const nameComp = a.name.localeCompare(b.name);
+        if (nameComp !== 0) return nameComp;
+
+        // ③ 価格（price）のソート
+        return a.price - b.price;
+      });
+
+      setFoods(sortedData);
+    } else {
+      setFoods([]);
+    }
   }
 
   useEffect(() => {
     fetchFoods()
     loadUser()
-  }, [])
+  }, [selectedFilterCategory, selectedFilterPrice]); // フィルター状態が変更されたら再フェッチ
+
+  // 📸 メモリリーク防止: previewImageが変わるたびに古いObjectURLを解放
+  useEffect(() => {
+    return () => {
+      if (previewImage) URL.revokeObjectURL(previewImage)
+    }
+  }, [previewImage])
 
   const loadUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -200,30 +182,92 @@ export default function Foods() {
     }
   }
 
+  // 共通の画像選択処理（メモリ管理含む）
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // 古いプレビューURLがあれば解放
+    if (previewImage) URL.revokeObjectURL(previewImage)
+
+    setSelectedFile(file)
+    setPreviewImage(URL.createObjectURL(file))
+  }
+
+  const handleImageUpdate = async () => {
+    if (!targetFood || !selectedFile) {
+      alert("画像を選択してください")
+      return
+    }
+    setUploading(true)
+    try {
+      const newImageUrl = await uploadImage(
+        selectedFile,
+        "food"
+      )
+
+      const { error: updateError } = await supabase
+        .from("menu_foods")
+        .update({ image_url: newImageUrl })
+        .eq("id", targetFood.id)
+
+      if (updateError) {
+        alert("更新失敗")
+        return
+      }
+      fetchFoods()
+      setTargetFood({ ...targetFood, image_url: newImageUrl })
+      setShowImageModal(false)
+      setSelectedFile(null)
+      setPreviewImage(null)
+    } catch (error: any) {
+      alert(error.message || String(error));
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const saveEdit = async () => {
     if (!editFood) return
 
-    const { error } = await supabase
-      .from("menu_foods")
-      .update({
-        name: editFood.name,
-        name_en: editFood.name_en,
-        foodcategory: editFood.foodcategory,
-        description: editFood.description,
-        image_url: editFood.image_url,
-        price: Number(editFood.price),
-        isactive: editFood.isactive
-      })
-      .eq("id", editFood.id)
+    setUploading(true)
+    try {
+      let imageUrl = editFood.image_url;
 
-    if (error) {
-      console.error("UPDATE ERROR:", error)
-      return
+      if (selectedFile) {
+        imageUrl = await uploadImage(
+          selectedFile,
+          "food"
+        )
+      }
+
+      const { error } = await supabase
+        .from("menu_foods")
+        .update({
+          name: editFood.name,
+          name_en: editFood.name_en,
+          foodcategory: editFood.foodcategory,
+          description: editFood.description,
+          image_url: imageUrl,
+          price: Number(editFood.price),
+          isactive: editFood.isactive
+        })
+        .eq("id", editFood.id)
+
+      if (error) {
+        console.error("UPDATE ERROR:", error)
+        return
+      }
+
+      fetchFoods()
+      setShowEdit(false)
+      setSelectedFile(null)
+      setPreviewImage(null)
+    } catch (error: any) {
+      alert(error.message || String(error));
+    } finally {
+      setUploading(false)
     }
-
-    fetchFoods()
-
-    setShowEdit(false)
   }
 
   const handleDelete = async (id: string) => {
@@ -243,53 +287,23 @@ export default function Foods() {
   }
 
   const addFood = async () => {
-    console.log("🔥 selectedFile at submit:", selectedFile)
-
     if (!newFood.name.trim()) {
       alert("名前を入力してください")
       return
     }
 
+    if (!selectedFile) {
+      alert("画像を選択してください")
+      return
+    }
+
     setUploading(true)
-
-    let imageUrl = ""
-
     try {
-      // =========================
-      // 画像アップロード
-      // =========================
-      if (selectedFile) {
-        console.log("② FILEあり")
+      const imageUrl = await uploadImage(
+        selectedFile,
+        "food"
+      )
 
-        const fileExt = selectedFile.name.split(".").pop()
-        const fileName = `${Date.now()}.${fileExt}`
-
-        const { data: uploadData, error: uploadError } =
-          await supabase.storage
-            .from("food-images")
-            .upload(fileName, selectedFile)
-
-        console.log("UPLOAD DATA:", uploadData)
-        console.log("UPLOAD ERROR:", uploadError)
-
-        if (uploadError) {
-          alert(uploadError.message)
-          setUploading(false)
-          return
-        }
-
-        const { data: publicData } = supabase.storage
-          .from("food-images")
-          .getPublicUrl(fileName)
-
-        imageUrl = publicData.publicUrl
-
-        console.log("FINAL IMAGE URL:", imageUrl)
-      }
-
-      // =========================
-      // DB INSERT
-      // =========================
       const { data, error } = await supabase
         .from("menu_foods")
         .insert([
@@ -299,27 +313,19 @@ export default function Foods() {
             foodcategory: newFood.foodcategory || "MAIN",
             description: newFood.description || "",
             price: Number(newFood.price || 0),
-            image_url: imageUrl,
+            image_url: imageUrl, // アップロードされたURLを使用
             isactive: newFood.isactive
           }
         ])
         .select()
 
-      console.log("INSERT DATA:", data)
-      console.log("INSERT ERROR:", error)
-
       if (error) {
         alert(error.message)
-        setUploading(false)
         return
       }
 
-      // =========================
-      // UI更新
-      // =========================
       await fetchFoods()
 
-      // 初期化
       setNewFood({
         name: "",
         name_en: "",
@@ -335,13 +341,12 @@ export default function Foods() {
       setShowAdd(false)
 
       alert("登録完了")
-
     } catch (e) {
       console.error(e)
       alert("登録失敗")
+    } finally {
+      setUploading(false)
     }
-
-    setUploading(false)
   }
 
   const addCategory = async () => {
@@ -356,11 +361,9 @@ export default function Foods() {
       return
     }
 
-    // 一覧を更新（アルファベット順にソート）
     const updated = [...categories, newCategoryName.trim()].sort()
     setCategories(updated)
 
-    // 現在編集/追加中の項目のカテゴリーを、今作ったものに自動セットする
     if (editFood) setEditFood({ ...editFood, foodcategory: newCategoryName.trim() })
     if (showAdd) setNewFood({ ...newFood, foodcategory: newCategoryName.trim() })
 
@@ -427,13 +430,13 @@ export default function Foods() {
       return
     }
 
-    const { error } = await supabase
+    const { error: bulkUpdateError } = await supabase
       .from("menu_foods")
       .update({ foodcategory: bulkCategory })
       .in("id", selected)
 
-    if (error) {
-      console.error("UPDATE ERROR:", error)
+    if (bulkUpdateError) {
+      console.error("UPDATE ERROR:", bulkUpdateError)
       return
     }
 
@@ -471,6 +474,43 @@ export default function Foods() {
       <h1 style={{ textAlign: "center", margin: "0 0 10px", fontSize: "35px" }}>
         Food管理
       </h1>
+
+      {/* フィルターUI */}
+      <div style={{ display: "flex", gap: "10px", marginBottom: "15px", flexWrap: "wrap" }}>
+        {/* カテゴリーフィルター */}
+        <div>
+          <label htmlFor="foodCategoryFilter" style={{ marginRight: "5px" }}>カテゴリー:</label>
+          <select
+            id="foodCategoryFilter"
+            value={selectedFilterCategory || ""}
+            onChange={(e) => setSelectedFilterCategory(e.target.value || null)}
+            style={{ padding: "5px", borderRadius: "4px", border: "1px solid #ccc" }}
+          >
+            <option value="">全て</option>
+            {categories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* 価格帯フィルター */}
+        <div>
+          <label htmlFor="foodPriceFilter" style={{ marginRight: "5px" }}>価格帯:</label>
+          <select
+            id="foodPriceFilter"
+            value={selectedFilterPrice || ""}
+            onChange={(e) => setSelectedFilterPrice(e.target.value || null)}
+            style={{ padding: "5px", borderRadius: "4px", border: "1px solid #ccc" }}
+          >
+            <option value="">全て</option>
+            <option value="0-500">¥0 - ¥500</option>
+            <option value="501-1000">¥501 - ¥1,000</option>
+            <option value="1001-2000">¥1,001 - ¥2,000</option>
+            <option value="2001+">¥2,001 以上</option>
+          </select>
+        </div>
+      </div>
+
       {/* 画面表示用エリア（ページネーション・ボタン・操作用テーブル） */}
       <div className="no-print">
         <table
@@ -821,8 +861,24 @@ export default function Foods() {
             borderRadius: "8px",
             width: "400px"
           }}>
+            <div
+              style={{
+                height: "18px",
+                background: "#8B5E3C",
+                borderTopLeftRadius: "8px",
+                borderTopRightRadius: "8px",
+                margin: "-20px -20px 20px -20px",
+              }}
+            />
 
-            <h3>フード編集</h3>
+            <h2
+              style={{
+                textAlign: "center",
+                marginBottom: "24px",
+              }}
+            >
+              フード編集
+            </h2>
 
             <input
               value={editFood.name}
@@ -923,7 +979,7 @@ export default function Foods() {
                 style={{ display: "block", fontSize: "11px", width: "200px", marginTop: "4px" }}
               />
               {editFood.image_url && (
-                <button 
+                <button
                   style={{ fontSize: "10px", marginTop: "4px", display: "block" }}
                   onClick={() => setEditFood({ ...editFood, image_url: null })}
                 >
@@ -950,8 +1006,8 @@ export default function Foods() {
               display:"flex",
               justifyContent:"space-between"
             }}>
-              <button onClick={()=>setShowEdit(false)}>キャンセル</button>
-              <button onClick={saveEdit}>保存</button>
+              <button disabled={uploading} onClick={()=>setShowEdit(false)}>キャンセル</button>
+              <button disabled={uploading} onClick={saveEdit}>{uploading ? "保存中..." : "保存"}</button>
             </div>
 
           </div>
@@ -977,8 +1033,24 @@ export default function Foods() {
             borderRadius: "8px",
             width: "400px"
           }}>
+            <div
+              style={{
+                height: "18px",
+                background: "#8B5E3C",
+                borderTopLeftRadius: "8px",
+                borderTopRightRadius: "8px",
+                margin: "-20px -20px 20px -20px",
+              }}
+            />
 
-            <h3>フード追加</h3>
+            <h2
+              style={{
+                textAlign: "center",
+                marginBottom: "24px",
+              }}
+            >
+              フード追加
+            </h2>
 
             <input
               placeholder="名前"
@@ -1067,18 +1139,11 @@ export default function Foods() {
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  console.log("📸 FILE SELECTED:", file)
-                  if (!file) return
-
-                  setSelectedFile(file)
-                  setPreviewImage(URL.createObjectURL(file))
-                }}
+                onChange={onFileChange}
                 style={{ display: "block", fontSize: "11px", width: "200px", marginTop: "4px" }}
               />
               {newFood.image_url && (
-                <button 
+                <button
                   style={{ fontSize: "10px", marginTop: "4px", display: "block" }}
                   onClick={() => setNewFood({ ...newFood, image_url: "" })}
                 >
@@ -1102,14 +1167,15 @@ export default function Foods() {
               display:"flex",
               justifyContent:"space-between"
             }}>
-              <button onClick={()=>setShowAdd(false)}>キャンセル</button>
+              <button disabled={uploading} onClick={()=>setShowAdd(false)}>キャンセル</button>
               <button
+                disabled={uploading}
                 onClick={() => {
                   console.log("🔥 BUTTON CLICK")
                   addFood()
                 }}
               >
-                登録
+                {uploading ? "登録中..." : "登録"}
               </button>
             </div>
 
@@ -1136,8 +1202,24 @@ export default function Foods() {
             borderRadius: "8px",
             width: "300px"
           }}>
+            <div
+              style={{
+                height: "18px",
+                background: "#8B5E3C",
+                borderTopLeftRadius: "8px",
+                borderTopRightRadius: "8px",
+                margin: "-20px -20px 20px -20px",
+              }}
+            />
 
-            <h3>一括価格変更</h3>
+            <h2
+              style={{
+                textAlign: "center",
+                marginBottom: "24px",
+              }}
+            >
+              一括価格変更
+            </h2>
 
             <div style={{ display: "flex", alignItems: "center", marginTop: "10px" }}>
               <span style={{ marginRight: "4px" }}>¥</span>
@@ -1190,8 +1272,24 @@ export default function Foods() {
             borderRadius: "8px",
             width: "300px"
           }}>
+            <div
+              style={{
+                height: "18px",
+                background: "#8B5E3C",
+                borderTopLeftRadius: "8px",
+                borderTopRightRadius: "8px",
+                margin: "-20px -20px 20px -20px",
+              }}
+            />
 
-            <h3>一括カテゴリー変更</h3>
+            <h2
+              style={{
+                textAlign: "center",
+                marginBottom: "24px",
+              }}
+            >
+              一括カテゴリー変更
+            </h2>
 
             <select
               value={bulkCategory}
@@ -1291,8 +1389,24 @@ export default function Foods() {
             width: "400px",
             textAlign: "center"
           }}>
+            <div
+              style={{
+                height: "18px",
+                background: "#8B5E3C",
+                borderTopLeftRadius: "8px",
+                borderTopRightRadius: "8px",
+                margin: "-20px -20px 20px -20px",
+              }}
+            />
 
-            <h3>画像変更</h3>
+            <h2
+              style={{
+                textAlign: "center",
+                marginBottom: "24px",
+              }}
+            >
+              画像変更
+            </h2>
 
             <div style={{
               display: "flex",
@@ -1338,14 +1452,7 @@ export default function Foods() {
               type="file"
               accept="image/*"
               style={{ marginTop: "15px" }}
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                console.log("📸 FILE SELECTED:", file)
-                if (!file) return
-
-                setSelectedFile(file)
-                setPreviewImage(URL.createObjectURL(file))
-              }}
+              onChange={onFileChange}
             />
 
             {uploading && <p>アップロード中...</p>}
@@ -1358,6 +1465,7 @@ export default function Foods() {
             }}>
 
               <button
+                disabled={uploading}
                 onClick={() => {
                   setShowImageModal(false)
                   setPreviewImage(null)
@@ -1368,6 +1476,7 @@ export default function Foods() {
               </button>
 
               <button
+                disabled={uploading}
                 onClick={async () => {
                   console.log("🔥 BUTTON CLICK")
 
@@ -1379,10 +1488,10 @@ export default function Foods() {
 
                   console.log("✅ selectedFileあり", selectedFile)
 
-                  await handleImageUpdate(selectedFile)
+                  await handleImageUpdate() // 引数なしで呼び出し
                 }}
               >
-                変更
+                {uploading ? "変更中..." : "変更"}
               </button>
             </div>
 
