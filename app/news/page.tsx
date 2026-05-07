@@ -222,20 +222,17 @@ export default function Page() {
       return
     }
 
-    console.log("INSERT DATA:", {
-      title: newNews.title,
-      body: newNews.body,
-      imageUrl,
-      isPublished: newNews.isPublished
-    })
-
-    const { error } = await supabase.from("news").insert({
-      title: newNews.title,
-      body: newNews.body,
-      imageUrl,
-      isPublished: newNews.isPublished,
-      createdAt: new Date().toISOString()
-    })
+    const { data, error } = await supabase
+      .from("news")
+      .insert({
+        title: newNews.title,
+        body: newNews.body,
+        imageUrl,
+        isPublished: newNews.isPublished,
+        createdAt: new Date().toISOString()
+      })
+      .select()
+      .single()
 
     console.log("INSERT ERROR:", JSON.stringify(error, null, 2))
 
@@ -244,6 +241,18 @@ export default function Page() {
       console.error(error)
       return
     }
+
+    await fetch("/api/send-news-push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title: "新着ニュース",
+        message: newNews.title,
+        newsId: data.id
+      })
+    })
 
     await load()
     setShowAdd(false)
@@ -389,8 +398,8 @@ export default function Page() {
         </thead>
 
         <tbody>
-          {paginatedNews.map((food) => (
-            <tr key={food.id}>
+          {paginatedNews.map((item) => (
+            <tr key={item.id}>
               <td
                 style={{
                   border: "1px solid #ddd",
@@ -402,8 +411,8 @@ export default function Page() {
               >
                 <input
                   type="checkbox"
-                  checked={selected.includes(food.id)}
-                  onChange={() => toggle(food.id)}
+                  checked={selected.includes(item.id)}
+                  onChange={() => toggle(item.id)}
                 />
               </td>
 
@@ -416,9 +425,9 @@ export default function Page() {
                   textAlign: "center"
                 }}
               >
-                {food.imageUrl && (
+                {item.imageUrl && (
                   <img
-                    src={food.imageUrl}
+                    src={item.imageUrl}
                     style={{
                       width: "40px",
                       height: "40px",
@@ -427,7 +436,7 @@ export default function Page() {
                       cursor: "pointer"
                     }}
                     onClick={() => {
-                      setTargetNews(food)
+                      setTargetNews(item)
                       setShowImageModal(true)
                     }}
                   />
@@ -445,7 +454,7 @@ export default function Page() {
                   textOverflow: "ellipsis"
                 }}
               >
-                {food.title}
+                {item.title}
               </td>
               <td
                 style={{
@@ -458,7 +467,7 @@ export default function Page() {
                   whiteSpace: "nowrap"
                 }}
               >
-                {food.body}
+                {item.body}
               </td>
 
               <td
@@ -469,24 +478,24 @@ export default function Page() {
                   lineHeight: "1.2"
                 }}
               >
-                {food.createdAt ? new Date(food.createdAt).toLocaleDateString() : ""}
+                {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ""}
               </td>
 
               <td style={{ textAlign: "center", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>
                 <input
                   type="checkbox"
-                  checked={food.isPublished}
-                  disabled={updatingId === food.id}
+                  checked={item.isPublished}
+                  disabled={updatingId === item.id}
                   onChange={async (e) => {
 
                     const value = e.target.checked
 
-                    setUpdatingId(food.id!)  // ← ロック開始
+                    setUpdatingId(item.id!)  // ← ロック開始
 
                     const { error } = await supabase
                       .from("news")
                       .update({ "isPublished": value })
-                      .eq("id", food.id)
+                      .eq("id", item.id)
 
                     console.log("update error:", error)
 
@@ -496,10 +505,10 @@ export default function Page() {
                       return
                     }
 
-                    setNews(news.map(item =>
-                      item.id === food.id
-                        ? { ...item, isPublished: value }
-                        : item
+                    setNews(news.map(n =>
+                      n.id === item.id
+                        ? { ...n, isPublished: value }
+                        : n
                     ))
 
                     setUpdatingId(null) // ← ロック解除
@@ -519,7 +528,7 @@ export default function Page() {
                 <button
                   style={{ fontSize: "11px", padding: "1px 6px" }}
                   onClick={() => {
-                    setEditNews({ ...food })
+                    setEditNews({ ...item })
                     setShowEdit(true)
                     setEditImage(null)
                     setPreview(null)
@@ -532,7 +541,7 @@ export default function Page() {
                   style={{ fontSize: "11px", padding: "1px 6px", color: "red" }}
                   onClick={async () => {
                     if (!confirm("このニュースを削除しますか？")) return
-                    await handleDelete(food.id)
+                    await handleDelete(item.id)
                   }}
                 >
                   削除
@@ -601,7 +610,14 @@ export default function Page() {
         </div>
 
         {/* 下ボタン */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: 12,
+            marginTop: 20
+          }}
+        >
           <button onClick={() => setShowAdd(true)}>ニュース投稿</button>
           <button
             onClick={async () => {

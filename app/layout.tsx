@@ -2,16 +2,34 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import "./globals.css"
-import { Home, Users, Beer, Utensils, Newspaper, Image } from "lucide-react"
+import {
+  Home,
+  Users,
+  Beer,
+  Utensils,
+  Newspaper,
+  Image
+} from "lucide-react"
 import Link from "next/link"
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout({
+  children
+}: {
+  children: React.ReactNode
+}) {
+
   const pathname = usePathname()
+
+  const router = useRouter()
+
   const [user, setUser] = useState<any>(null)
+
   const [userData, setUserData] = useState<any>(null)
+
   const [openMenu, setOpenMenu] = useState(false)
+
   const [showPassModal, setShowPassModal] = useState(false)
 
   useEffect(() => {
@@ -19,12 +37,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [])
 
   const loadUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+
+    const {
+      data: { user }
+    } = await supabase.auth.getUser()
 
     console.log("Auth:", user)
 
     if (!user) {
-      setTimeout(loadUser, 300) // 少し待って再取得
+
+      setUser(null)
+
+      setUserData(null)
+
       return
     }
 
@@ -37,21 +62,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       .maybeSingle()
 
     console.log("DB:", data)
+
     setUserData(data)
   }
 
   return (
+
     <html lang="ja">
+
       <body style={{ margin: 0 }}>
+
         <div style={{ position: "relative" }}>
+
           {/* 通常レイアウト */}
           <div>
-            <div className="app" style={{ 
-              display: "flex", 
-              flexDirection: "column", 
-              height: "100vh" 
-            }}>
+
+            <div
+              className="app"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                height: "100vh"
+              }}
+            >
+
               {/* HEADER */}
+
               <header
                 className="header no-print"
                 style={{
@@ -71,8 +107,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </header>
 
               {/* BODY */}
-              <div className="content" style={{ display: "flex", flex: 1 }}>
+
+              <div
+                className="content"
+                style={{
+                  display: "flex",
+                  flex: 1
+                }}
+              >
+
                 {/* SIDEBAR */}
+
                 <aside
                   className="sidebar no-print"
                   style={{
@@ -84,6 +129,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     flexDirection: "column"
                   }}
                 >
+
                   <div
                     className="logo"
                     style={{
@@ -95,6 +141,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   >
                     ADMIN
                   </div>
+
                   <nav
                     className="menuList"
                     style={{
@@ -104,39 +151,104 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       gap: "20px"
                     }}
                   >
-                    <Link href="/dashboard" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+
+                    <Link
+                      href="/dashboard"
+                      className="menuItem"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        width: "140px"
+                      }}
+                    >
                       <Home size={30} />
                       <span>Dashboard</span>
                     </Link>
-                    <Link href="/users" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+
+                    <Link
+                      href="/users"
+                      className="menuItem"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        width: "140px"
+                      }}
+                    >
                       <Users size={30} />
                       <span>Users</span>
                     </Link>
-                    <Link href="/drinks" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+
+                    <Link
+                      href="/drinks"
+                      className="menuItem"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        width: "140px"
+                      }}
+                    >
                       <Beer size={30} />
                       <span>Drink</span>
                     </Link>
-                    <Link href="/foods" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+
+                    <Link
+                      href="/foods"
+                      className="menuItem"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        width: "140px"
+                      }}
+                    >
                       <Utensils size={30} />
                       <span>Food</span>
                     </Link>
-                    <Link href="/news" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+
+                    <Link
+                      href="/news"
+                      className="menuItem"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        width: "140px"
+                      }}
+                    >
                       <Newspaper size={30} />
                       <span>News</span>
                     </Link>
-                    <Link href="/slider" className="menuItem" style={{ display: "flex", alignItems: "center", gap: "10px", width: "140px" }}>
+
+                    <Link
+                      href="/slider"
+                      className="menuItem"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        width: "140px"
+                      }}
+                    >
                       <Image size={30} />
                       <span>Slider</span>
                     </Link>
+
                   </nav>
 
-                  <div style={{
-                    marginTop: "10px",
-                    padding: "10px",
-                    textAlign: "center",
-                    color: "#333"
-                  }}>
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      padding: "10px",
+                      textAlign: "center",
+                      color: "#333"
+                    }}
+                  >
+
                     {/* ボタン */}
+
                     <div
                       onClick={() => setOpenMenu(!openMenu)}
                       style={{
@@ -154,18 +266,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </div>
 
                     {/* ドロップダウン */}
+
                     {openMenu && (
-                      <div style={{
-                        background: "#fff",
-                        marginTop: "8px",
-                        borderRadius: "8px",
-                        overflow: "hidden",
-                        boxShadow: "0 4px 8px rgba(0,0,0,0.15)"
-                      }}>
+
+                      <div
+                        style={{
+                          background: "#fff",
+                          marginTop: "8px",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          boxShadow: "0 4px 8px rgba(0,0,0,0.15)"
+                        }}
+                      >
+
                         <div
                           onClick={() => {
+
                             setShowPassModal(true)
+
                             setOpenMenu(false)
+
                           }}
                           style={{
                             padding: "10px",
@@ -175,10 +295,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         >
                           パスワード変更
                         </div>
+
                         <div
                           onClick={async () => {
+
                             await supabase.auth.signOut()
-                            location.reload()
+
+                            setUser(null)
+
+                            setUserData(null)
+
+                            setOpenMenu(false)
+
+                            router.push("/dashboard")
+
                           }}
                           style={{
                             padding: "10px",
@@ -189,28 +319,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         >
                           ログアウト
                         </div>
+
                       </div>
+
                     )}
+
                   </div>
+
                 </aside>
 
                 {/* MAIN */}
-                <div style={{
-                  flex: 1,
-                  display: "flex",
-                  justifyContent: "center"
-                }}>
+
+                <div
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    justifyContent: "center"
+                  }}
+                >
                   {children}
                 </div>
+
               </div>
+
             </div>
+
           </div>
 
           {/* モーダル */}
-          {!user && <LoginModal onLogin={loadUser} />}
-          {showPassModal && <PasswordModal onClose={() => setShowPassModal(false)} />}
+
+          {!user && (
+            <LoginModal onLogin={loadUser} />
+          )}
+
+          {showPassModal && (
+            <PasswordModal
+              onClose={() => setShowPassModal(false)}
+            />
+          )}
+
         </div>
+
       </body>
+
     </html>
   )
 }
@@ -218,30 +369,47 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 /**
  * 簡易ログイン促しモーダル
  */
-function LoginModal({ onLogin }: { onLogin: () => void }) {
+
+function LoginModal({
+  onLogin
+}: {
+  onLogin: () => void
+}) {
+
   const [email, setEmail] = useState("")
+
   const [password, setPassword] = useState("")
+
   const [showPassword, setShowPassword] = useState(false)
+
   const [loading, setLoading] = useState(false)
 
   const handleLogin = async () => {
+
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
+
+    const { error } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
 
     if (error) {
+
       alert("ログイン失敗")
+
       setLoading(false)
+
       return
     }
 
     onLogin()
+
     setLoading(false)
   }
 
   return (
+
     <div
       style={{
         position: "fixed",
@@ -253,6 +421,7 @@ function LoginModal({ onLogin }: { onLogin: () => void }) {
         zIndex: 9999,
       }}
     >
+
       <div
         style={{
           background: "#fff",
@@ -262,19 +431,26 @@ function LoginModal({ onLogin }: { onLogin: () => void }) {
           overflow: "hidden"
         }}
       >
+
         {/* 上のカラーバー */}
-        <div style={{
-          height: "20px",
-          background: "#7a5a3a"
-        }} />
+
+        <div
+          style={{
+            height: "20px",
+            background: "#7a5a3a"
+          }}
+        />
 
         <div style={{ padding: "30px" }}>
-          <h2 style={{
-            marginBottom: "20px",
-            textAlign: "center",
-            fontSize: "22px",
-            fontWeight: "600"
-          }}>
+
+          <h2
+            style={{
+              marginBottom: "20px",
+              textAlign: "center",
+              fontSize: "22px",
+              fontWeight: "600"
+            }}
+          >
             Login
           </h2>
 
@@ -291,19 +467,26 @@ function LoginModal({ onLogin }: { onLogin: () => void }) {
             }}
           />
 
-          <div style={{ position: "relative", marginBottom: "16px" }}>
+          <div
+            style={{
+              position: "relative",
+              marginBottom: "16px"
+            }}
+          >
+
             <input
               type={showPassword ? "text" : "password"}
               placeholder="Password"
               onChange={(e) => setPassword(e.target.value)}
               style={{
                 width: "100%",
-                padding: "10px 40px 10px 10px", // 👈 右余白重要
+                padding: "10px 40px 10px 10px",
                 borderRadius: "6px",
                 border: "1px solid #ccc",
                 boxSizing: "border-box"
               }}
             />
+
             <span
               onClick={() => setShowPassword(!showPassword)}
               style={{
@@ -318,26 +501,26 @@ function LoginModal({ onLogin }: { onLogin: () => void }) {
             >
               {showPassword ? "🙈" : "👁"}
             </span>
+
           </div>
 
-          <button
-            onClick={handleLogin}
-            disabled={loading}
-            style={{
-              width: "100%",
-              padding: "10px",
-              background: loading ? "#ccc" : "#7a5a3a",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              cursor: loading ? "not-allowed" : "pointer",
-              fontWeight: "600"
-            }}
-          >
-            {loading ? "ログイン中..." : "ログイン"}
-          </button>
+          <div style={{ textAlign: "center" }}>
+
+            <button
+              onClick={handleLogin}
+              disabled={loading}
+            >
+              {loading
+                ? "ログイン中..."
+                : "ログイン"}
+            </button>
+
+          </div>
+
         </div>
+
       </div>
+
     </div>
   );
 }
@@ -345,67 +528,131 @@ function LoginModal({ onLogin }: { onLogin: () => void }) {
 /**
  * パスワード変更モーダル
  */
-function PasswordModal({ onClose }: { onClose: () => void }) {
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
+
+function PasswordModal({
+  onClose
+}: {
+  onClose: () => void
+}) {
+
+  const [newPassword, setNewPassword] =
+    useState("")
+
+  const [confirmPassword, setConfirmPassword] =
+    useState("")
+
   const [loading, setLoading] = useState(false)
+
   const [message, setMessage] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
+
+  const [showPassword, setShowPassword] =
+    useState(false)
 
   const handleUpdate = async () => {
+
     if (!newPassword) {
-      setMessage("新しいパスワードを入力してください")
+
+      setMessage(
+        "新しいパスワードを入力してください"
+      )
+
       return
     }
+
     if (newPassword !== confirmPassword) {
-      setMessage("エラー: パスワードが一致しません")
+
+      setMessage(
+        "エラー: パスワードが一致しません"
+      )
+
       return
     }
+
     setLoading(true)
+
     setMessage("")
 
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    })
+    const { error } =
+      await supabase.auth.updateUser({
+        password: newPassword
+      })
 
     if (error) {
-      setMessage("エラー: " + error.message)
+
+      setMessage(
+        "エラー: " + error.message
+      )
+
     } else {
-      setMessage("パスワードを更新しました")
+
+      setMessage(
+        "パスワードを更新しました"
+      )
+
       setTimeout(onClose, 1500)
     }
+
     setLoading(false)
   }
 
   return (
-    <div style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.4)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 10000,
-    }}>
-      <div style={{
-        background: "#fff",
-        borderRadius: "12px",
-        width: "320px",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-        overflow: "hidden"
-      }}>
-        <div style={{ height: "20px", background: "#7a5a3a" }} />
+
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.4)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 10000,
+      }}
+    >
+
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "12px",
+          width: "320px",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+          overflow: "hidden"
+        }}
+      >
+
+        <div
+          style={{
+            height: "20px",
+            background: "#7a5a3a"
+          }}
+        />
+
         <div style={{ padding: "30px" }}>
-          <h2 style={{ marginBottom: "20px", textAlign: "center", fontSize: "20px", fontWeight: "600" }}>
+
+          <h2
+            style={{
+              marginBottom: "20px",
+              textAlign: "center",
+              fontSize: "20px",
+              fontWeight: "600"
+            }}
+          >
             パスワード変更
           </h2>
 
-          <div style={{ position: "relative", marginBottom: "16px" }}>
+          <div
+            style={{
+              position: "relative",
+              marginBottom: "16px"
+            }}
+          >
+
             <input
               type={showPassword ? "text" : "password"}
               placeholder="新しいパスワード"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              onChange={(e) =>
+                setNewPassword(e.target.value)
+              }
               style={{
                 width: "100%",
                 padding: "10px 40px 10px 10px",
@@ -414,8 +661,11 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
                 boxSizing: "border-box"
               }}
             />
+
             <span
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() =>
+                setShowPassword(!showPassword)
+              }
               style={{
                 position: "absolute",
                 right: "10px",
@@ -428,14 +678,23 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
             >
               {showPassword ? "🙈" : "👁"}
             </span>
+
           </div>
 
-          <div style={{ position: "relative", marginBottom: "16px" }}>
+          <div
+            style={{
+              position: "relative",
+              marginBottom: "16px"
+            }}
+          >
+
             <input
               type={showPassword ? "text" : "password"}
               placeholder="確認用パスワード"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e) =>
+                setConfirmPassword(e.target.value)
+              }
               style={{
                 width: "100%",
                 padding: "10px 40px 10px 10px",
@@ -444,8 +703,11 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
                 boxSizing: "border-box"
               }}
             />
+
             <span
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() =>
+                setShowPassword(!showPassword)
+              }
               style={{
                 position: "absolute",
                 right: "10px",
@@ -458,45 +720,114 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
             >
               {showPassword ? "🙈" : "👁"}
             </span>
+
           </div>
 
           {confirmPassword && (
-            <div style={{
-              fontSize: "12px",
-              marginTop: "-12px",
-              marginBottom: "12px",
-              textAlign: "left",
-              color: newPassword === confirmPassword ? "#28a745" : "#dc3545",
-              fontWeight: "600"
-            }}>
-              <span style={{ fontSize: "8px", verticalAlign: "middle", marginRight: "4px" }}>●</span>
-              {newPassword === confirmPassword ? "一致しています" : "一致していません"}
+
+            <div
+              style={{
+                fontSize: "12px",
+                marginTop: "-12px",
+                marginBottom: "12px",
+                textAlign: "left",
+                color:
+                  newPassword === confirmPassword
+                    ? "#28a745"
+                    : "#dc3545",
+                fontWeight: "600"
+              }}
+            >
+
+              <span
+                style={{
+                  fontSize: "8px",
+                  verticalAlign: "middle",
+                  marginRight: "4px"
+                }}
+              >
+                ●
+              </span>
+
+              {newPassword === confirmPassword
+                ? "一致しています"
+                : "一致していません"}
+
             </div>
+
           )}
 
           {message && (
-            <p style={{
-              color: message.startsWith("エラー") ? "red" : "green",
-              fontSize: "13px",
-              textAlign: "center",
-              marginBottom: "15px"
-            }}>
+
+            <p
+              style={{
+                color:
+                  message.startsWith("エラー")
+                    ? "red"
+                    : "green",
+                fontSize: "13px",
+                textAlign: "center",
+                marginBottom: "15px"
+              }}
+            >
               {message}
             </p>
+
           )}
 
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button onClick={onClose} style={{ flex: 1, padding: "10px", background: "#eee", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "600" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px"
+            }}
+          >
+
+            <button
+              onClick={onClose}
+              style={{
+                flex: 1,
+                padding: "10px",
+                background: "#eee",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "600"
+              }}
+            >
               閉じる
             </button>
-            <button onClick={handleUpdate} disabled={loading} style={{
-              flex: 1, padding: "10px", background: loading ? "#ccc" : "#7a5a3a", color: "#fff", border: "none", borderRadius: "6px", cursor: loading ? "not-allowed" : "pointer", fontWeight: "600"
-            }}>
-              {loading ? "更新中..." : "保存"}
+
+            <button
+              onClick={handleUpdate}
+              disabled={loading}
+              style={{
+                flex: 1,
+                padding: "10px",
+                background:
+                  loading
+                    ? "#ccc"
+                    : "#7a5a3a",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                cursor:
+                  loading
+                    ? "not-allowed"
+                    : "pointer",
+                fontWeight: "600"
+              }}
+            >
+              {loading
+                ? "更新中..."
+                : "保存"}
             </button>
+
           </div>
+
         </div>
+
       </div>
+
     </div>
   )
 }
