@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server"
 import admin from "firebase-admin"
-
-const serviceAccount =
-  require("@/firebase-service-account.json")
+import serviceAccount from "../../../firebase-service-account.json"
 
 if (!admin.apps.length) {
 
   admin.initializeApp({
     credential:
-      admin.credential.cert(serviceAccount)
+      admin.credential.cert(serviceAccount as admin.ServiceAccount)
   })
 
 }
@@ -19,8 +17,6 @@ export async function POST(req: Request) {
 
     const body = await req.json()
 
-    console.log("PUSH BODY:", body)
-
     const title =
       body.title || "新着ニュース"
 
@@ -29,8 +25,6 @@ export async function POST(req: Request) {
 
     const newsId =
       String(body.newsId || "")
-
-    console.log("START PUSH")
 
     const response =
       await admin.messaging().send({
