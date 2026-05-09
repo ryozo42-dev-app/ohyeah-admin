@@ -560,7 +560,14 @@ export default function Drinks() {
                 </button>
 
                 <button
-                  style={{ fontSize: "11px", padding: "1px 6px", color: "red" }}
+                  style={{
+                    fontSize: "11px",
+                    padding: "1px 6px",
+                    color: "red",
+                    opacity: isAdmin ? 1 : 0.4,
+                    cursor: isAdmin ? "pointer" : "not-allowed"
+                  }}
+                  disabled={!isAdmin}
                   onClick={() => {
                     if (!confirm("このドリンクを削除しますか？")) return
                     handleDelete(food.id)

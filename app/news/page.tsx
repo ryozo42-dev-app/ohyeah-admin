@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { uploadImage } from "@/lib/uploadImage"
+import { deleteImage } from "@/lib/deleteImage"
 
 type News = {
   id: number
@@ -14,10 +15,15 @@ type News = {
   isPublished: boolean
 }
 
+type UserData = {
+  id: string
+  role: string
+} | null
+
 export default function Page() {
 
   const [news, setNews] = useState<News[]>([])
-  const [userData, setUserData] = useState<any>(null)
+  const [userData, setUserData] = useState<UserData>(null)
   const isAdmin = userData?.role === "admin"
   const [selected, setSelected] = useState<number[]>([])
   const [page, setPage] = useState(1)
@@ -26,10 +32,10 @@ export default function Page() {
   const [showAdd, setShowAdd] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
 
-  const [editNews, setEditNews] = useState<any>(null)
+  const [editNews, setEditNews] = useState<News | null>(null)
 
   const [showImageModal, setShowImageModal] = useState(false)
-  const [targetNews, setTargetNews] = useState<any>(null)
+  const [targetNews, setTargetNews] = useState<News | null>(null)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -83,10 +89,8 @@ export default function Page() {
 
   const loadUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setTimeout(loadUser, 500)
-      return
-    }
+    if (!user) return
+
     const { data } = await supabase
       .from("users")
       .select("*")
@@ -138,6 +142,8 @@ export default function Page() {
   const handleDelete = async (id: number) => {
     console.log("🔥 DELETE START - ID:", id, "Type:", typeof id)
 
+    const target = news.find(n => n.id === id)
+
     const { data, error } = await supabase
       .from("news")
       .delete()
@@ -150,6 +156,10 @@ export default function Page() {
       console.error("DELETE ERROR:", error)
       alert("削除失敗")
       return
+    }
+
+    if (target?.imageUrl) {
+      await deleteImage(target.imageUrl)
     }
 
     if (!data || data.length === 0) {
@@ -188,77 +198,98 @@ export default function Page() {
   }
 
   /* -------------------------
-  publish
-  ------------------------- */
-
-  const togglePublish = async (n: News) => {
-    await supabase
-      .from("news")
-      .update({ isPublished: !n.isPublished })
-      .eq("id", n.id)
-
-    await load()
-  }
-
-  /* -------------------------
   add
   ------------------------- */
 
   const addNews = async () => {
-    if (!newNews.title.trim()) {
-      alert("タイトルを入力してください")
-      return
+
+  if (!newNews.title.trim()) {
+    alert("タイトルを入力してください")
+    return
+  }
+
+  let imageUrl = ""
+
+  try {
+
+    if (newImageFile) {
+      imageUrl = await uploadImage(newImageFile)
     }
 
-    let imageUrl = ""
+  } catch (err) {
 
-    try {
-      if (newImageFile) {
-        imageUrl = await uploadImage(newImageFile)
-      }
-    } catch (err) {
-      console.error(err)
-      alert("画像アップロード失敗")
-      return
-    }
+    console.error(err)
+    alert("画像アップロード失敗")
+    return
 
-    const { data, error } = await supabase
-      .from("news")
-      .insert({
-        title: newNews.title,
-        body: newNews.body,
-        imageUrl,
-        isPublished: newNews.isPublished,
-        createdAt: new Date().toISOString()
-      })
-      .select()
-      .single()
+  }
 
-    console.log("INSERT ERROR:", JSON.stringify(error, null, 2))
+  const { data, error } = await supabase
+    .from("news")
+    .insert({
+      title: newNews.title,
+      body: newNews.body,
+      imageUrl,
+      isPublished: newNews.isPublished,
+      createdAt: new Date().toISOString()
+    })
+    .select()
+    .single()
 
-    if (error) {
-      alert("投稿失敗")
-      console.error(error)
-      return
-    }
+  console.log("INSERT DATA:", data)
+  console.log("INSERT ERROR:", error)
 
-    await fetch("/api/send-news-push", {
+  if (error || !data) {
+
+    alert("投稿失敗")
+    console.error(error)
+    return
+
+  }
+
+  try {
+
+    console.log("START PUSH FETCH")
+
+    const res = await fetch("/api/send-news-push", {
+
       method: "POST",
+
       headers: {
         "Content-Type": "application/json"
       },
+
       body: JSON.stringify({
         title: "新着ニュース",
         message: newNews.title,
         newsId: data.id
       })
+
     })
 
-    await load()
-    setShowAdd(false)
-    setNewNews({ title: "", body: "", imageUrl: "", isPublished: true })
-    setNewImageFile(null)
-    setPreviewAdd(null)
+    const result = await res.text()
+
+    console.log("PUSH RESPONSE:", result)
+
+  } catch (pushErr) {
+
+    console.error("PUSH FETCH ERROR:", pushErr)
+
+  }
+
+  await load()
+
+  setShowAdd(false)
+
+  setNewNews({
+    title: "",
+    body: "",
+    imageUrl: "",
+    isPublished: true
+  })
+
+  setNewImageFile(null)
+  setPreviewAdd(null)
   }
 
   /* -------------------------
@@ -273,6 +304,7 @@ export default function Page() {
 
       setUploading(true)
 
+      const oldImageUrl = targetNews.imageUrl
       const imageUrl = await uploadImage(file)
 
       const { error } = await supabase
@@ -285,6 +317,10 @@ export default function Page() {
         alert("DB更新失敗")
         setUploading(false)
         return
+      }
+
+      if (oldImageUrl) {
+        await deleteImage(oldImageUrl)
       }
 
       await load()
@@ -317,6 +353,7 @@ export default function Page() {
 
     try {
       let imageUrl = editNews.imageUrl || ""
+      let oldImageUrl = editNews.imageUrl || "" // oldImageUrlは既に存在します
 
       // 新画像がある場合アップロード
       if (editImage) {
@@ -338,6 +375,10 @@ export default function Page() {
         alert("更新失敗")
         setUpdatingId(null)
         return
+      }
+
+      if (editImage && oldImageUrl) { // この条件で、新しい画像が選択され、かつ古い画像が存在する場合にのみ削除されます
+        await deleteImage(oldImageUrl)
       }
 
       await load()
@@ -425,22 +466,39 @@ export default function Page() {
                   textAlign: "center"
                 }}
               >
-                {item.imageUrl && (
-                  <img
-                    src={item.imageUrl}
-                    style={{
-                      width: "40px",
-                      height: "40px",
-                      objectFit: "cover",
-                      borderRadius: "4px",
-                      cursor: "pointer"
-                    }}
-                    onClick={() => {
-                      setTargetNews(item)
-                      setShowImageModal(true)
-                    }}
-                  />
-                )}
+                <div
+                  onClick={() => {
+                    setTargetNews(item)
+                    setShowImageModal(true)
+                  }}
+                  style={{
+                    width: "40px",
+                    height: "40px",
+                    border: "1px solid #ccc",
+                    borderRadius: "4px",
+                    overflow: "hidden",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#f5f5f5",
+                    fontSize: "10px",
+                    margin: "0 auto"
+                  }}
+                >
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover"
+                      }}
+                    />
+                  ) : (
+                    <span>画像なし</span>
+                  )}
+                </div>
               </td>
 
               <td
@@ -478,7 +536,7 @@ export default function Page() {
                   lineHeight: "1.2"
                 }}
               >
-                {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ""}
+                {item.createdAt ? item.createdAt.toLocaleDateString() : ""}
               </td>
 
               <td style={{ textAlign: "center", border: "1px solid #ddd", padding: "3px 6px", fontSize: "12px", lineHeight: "1.2" }}>
@@ -490,7 +548,7 @@ export default function Page() {
 
                     const value = e.target.checked
 
-                    setUpdatingId(item.id!)  // ← ロック開始
+                    setUpdatingId(item.id)  // ← ロック開始
 
                     const { error } = await supabase
                       .from("news")
@@ -538,7 +596,14 @@ export default function Page() {
                 </button>
 
                 <button
-                  style={{ fontSize: "11px", padding: "1px 6px", color: "red" }}
+                  style={{
+                    fontSize: "11px",
+                    padding: "1px 6px",
+                    color: "red",
+                    opacity: isAdmin ? 1 : 0.4,
+                    cursor: isAdmin ? "pointer" : "not-allowed"
+                  }}
+                  disabled={!isAdmin}
                   onClick={async () => {
                     if (!confirm("このニュースを削除しますか？")) return
                     await handleDelete(item.id)
@@ -765,51 +830,6 @@ export default function Page() {
                   value={editNews.body}
                   onChange={(e) => setEditNews({ ...editNews, body: e.target.value })}
                 />
-              </div>
-
-              <div className="modalField">
-                <label style={{ marginTop: "10px" }}>画像</label>
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    setEditImage(file)
-                    setPreview(URL.createObjectURL(file))
-                  }}
-                />
-
-                {/* 現在画像 */}
-                {!preview && editNews.imageUrl && (
-                  <img
-                    src={editNews.imageUrl}
-                    style={{
-                      marginTop: "10px",
-                      width: "140px",
-                      height: "140px",
-                      objectFit: "cover",
-                      borderRadius: "8px",
-                      border: "1px solid #ccc"
-                    }}
-                  />
-                )}
-
-                {/* 新プレビュー */}
-                {preview && (
-                  <img
-                    src={preview}
-                    style={{
-                      marginTop: "10px",
-                      width: "140px",
-                      height: "140px",
-                      objectFit: "cover",
-                      borderRadius: "8px",
-                      border: "1px solid #ccc"
-                    }}
-                  />
-                )}
               </div>
 
               <div className="modalField">

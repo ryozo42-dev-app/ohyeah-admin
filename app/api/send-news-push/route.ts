@@ -1,14 +1,20 @@
 import { NextResponse } from "next/server"
 import admin from "firebase-admin"
 
-const serviceAccount =
-  require("../../../firebase-service-account.json")
+const serviceAccount = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey:
+    process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+}
 
 if (!admin.apps.length) {
 
   admin.initializeApp({
     credential:
-      admin.credential.cert(serviceAccount as admin.ServiceAccount)
+      admin.credential.cert(
+        serviceAccount as admin.ServiceAccount
+      )
   })
 
 }
@@ -39,7 +45,9 @@ export async function POST(req: Request) {
         },
 
         data: {
-          newsId
+          newsId,
+          click_action:
+            "FLUTTER_NOTIFICATION_CLICK"
         },
 
         android: {
@@ -47,8 +55,6 @@ export async function POST(req: Request) {
           notification: {
             sound: "default",
             channelId: "default",
-            clickAction:
-              "FLUTTER_NOTIFICATION_CLICK"
           }
         },
 
@@ -84,7 +90,10 @@ export async function POST(req: Request) {
 
       })
 
-    console.log("PUSH SUCCESS:", response)
+    console.log(
+      "PUSH SUCCESS:",
+      response
+    )
 
     return NextResponse.json({
       success: true
@@ -92,7 +101,10 @@ export async function POST(req: Request) {
 
   } catch (err) {
 
-    console.error("PUSH ERROR:", err)
+    console.error(
+      "PUSH ERROR:",
+      err
+    )
 
     return NextResponse.json({
       success: false,

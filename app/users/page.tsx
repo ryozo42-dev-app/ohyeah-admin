@@ -366,8 +366,11 @@ export default function Users() {
                   style={{
                     fontSize: "11px",
                     padding: "1px 6px",
-                    color: "red"
+                    color: "red",
+                    opacity: isAdmin ? 1 : 0.4,
+                    cursor: isAdmin ? "pointer" : "not-allowed"
                   }}
+                  disabled={!isAdmin}
                   onClick={() => {
 
                     if (!confirm("このユーザーを削除しますか？")) return

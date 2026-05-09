@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { uploadImage } from "@/lib/uploadImage" // uploadImageユーティリティは引き続き使用
+import { deleteImage } from "@/lib/deleteImage"
 
 type Food = {
   id: string
@@ -201,6 +202,7 @@ export default function Foods() {
     }
     setUploading(true)
     try {
+      const oldImageUrl = targetFood.image_url
       const newImageUrl = await uploadImage(
         selectedFile,
         "food"
@@ -215,6 +217,11 @@ export default function Foods() {
         alert("更新失敗")
         return
       }
+
+      if (oldImageUrl) {
+        await deleteImage(oldImageUrl)
+      }
+
       fetchFoods()
       setTargetFood({ ...targetFood, image_url: newImageUrl })
       setShowImageModal(false)
@@ -233,6 +240,7 @@ export default function Foods() {
     setUploading(true)
     try {
       let imageUrl = editFood.image_url;
+      const oldImageUrl = editFood.image_url;
 
       if (selectedFile) {
         imageUrl = await uploadImage(
@@ -259,6 +267,10 @@ export default function Foods() {
         return
       }
 
+      if (selectedFile && oldImageUrl) {
+        await deleteImage(oldImageUrl)
+      }
+
       fetchFoods()
       setShowEdit(false)
       setSelectedFile(null)
@@ -273,6 +285,8 @@ export default function Foods() {
   const handleDelete = async (id: string) => {
     console.log("🔥 DELETE:", id)
 
+    const target = foods.find(f => f.id === id)
+
     const { error } = await supabase
       .from("menu_foods")
       .delete()
@@ -281,6 +295,10 @@ export default function Foods() {
     if (error) {
       console.error("DELETE ERROR:", error)
       return
+    }
+
+    if (target?.image_url) {
+      await deleteImage(target.image_url)
     }
 
     fetchFoods()
@@ -559,21 +577,39 @@ export default function Foods() {
               </td>
 
               <td style={{ border: "1px solid #ddd", textAlign: "center", width: "60px" }}>
-                {food.image_url && (
-                  <img
-                    src={food.image_url}
-                    style={{
-                      width: "40px",
-                      height: "40px",
-                      objectFit: "cover",
-                      cursor: "pointer"
-                    }}
-                    onClick={() => {
-                      setTargetFood(food)
-                      setShowImageModal(true)
-                    }}
-                  />
-                )}
+                <div
+                  onClick={() => {
+                    setTargetFood(food)
+                    setShowImageModal(true)
+                  }}
+                  style={{
+                    width: "40px",
+                    height: "40px",
+                    border: "1px solid #ccc",
+                    borderRadius: "4px",
+                    overflow: "hidden",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#f5f5f5",
+                    fontSize: "10px",
+                    margin: "0 auto"
+                  }}
+                >
+                  {food.image_url ? (
+                    <img
+                      src={food.image_url}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover"
+                      }}
+                    />
+                  ) : (
+                    <span>画像なし</span>
+                  )}
+                </div>
               </td>
 
               <td style={{ border: "1px solid #ddd", padding: "2px 4px", whiteSpace: "nowrap" }}>
@@ -654,7 +690,14 @@ export default function Foods() {
                 </button>
 
                 <button
-                  style={{ fontSize: "11px", padding: "1px 6px", color: "red" }}
+                  style={{
+                    fontSize: "11px",
+                    padding: "1px 6px",
+                    color: "red",
+                    opacity: isAdmin ? 1 : 0.4,
+                    cursor: isAdmin ? "pointer" : "not-allowed"
+                  }}
+                  disabled={!isAdmin}
                   onClick={() => {
                     if (!confirm("このフードを削除しますか？")) return
                     handleDelete(food.id)
@@ -950,44 +993,6 @@ export default function Foods() {
               placeholder="価格"
               style={{ width:"100%", marginBottom:"10px" }}
             />
-
-            <div style={{ marginBottom: "10px" }}>
-              <label style={{ display: "block", fontSize: "11px", marginBottom: "4px" }}>画像</label>
-              {(previewImage || editFood?.image_url) && (
-                <img
-                  src={previewImage || editFood.image_url || ""}
-                  alt="preview"
-                  style={{
-                    width: "80px",
-                    height: "80px",
-                    objectFit: "cover",
-                    marginTop: "8px"
-                  }}
-                />
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  console.log("📸 FILE SELECTED:", file)
-                  if (!file) return
-
-                  setSelectedFile(file)
-                  setPreviewImage(URL.createObjectURL(file))
-                }}
-                style={{ display: "block", fontSize: "11px", width: "200px", marginTop: "4px" }}
-              />
-              {editFood.image_url && (
-                <button
-                  style={{ fontSize: "10px", marginTop: "4px", display: "block" }}
-                  onClick={() => setEditFood({ ...editFood, image_url: null })}
-                >
-                  画像を削除
-                </button>
-              )}
-              {uploading && <span style={{ fontSize: "10px", color: "#666", marginLeft: "8px" }}>アップロード中...</span>}
-            </div>
 
             <label>
               <input

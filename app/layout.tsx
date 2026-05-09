@@ -384,6 +384,18 @@ function LoginModal({
 
   const [loading, setLoading] = useState(false)
 
+  const [showResetModal, setShowResetModal] =
+    useState(false)
+
+  const [resetEmail, setResetEmail] =
+    useState("")
+
+  const [resetMessage, setResetMessage] =
+    useState("")
+
+  const [resetLoading, setResetLoading] =
+    useState(false)
+
   const handleLogin = async () => {
 
     setLoading(true)
@@ -517,9 +529,221 @@ function LoginModal({
 
           </div>
 
+          <div
+            style={{
+              marginTop: "14px",
+              textAlign: "center"
+            }}
+          >
+
+            <span
+              onClick={() =>
+                setShowResetModal(true)
+              }
+              style={{
+                fontSize: "13px",
+                color: "#7a5a3a",
+                cursor: "pointer",
+                textDecoration: "underline"
+              }}
+            >
+              パスワードを忘れましたか？
+            </span>
+
+          </div>
+
         </div>
 
       </div>
+
+      {showResetModal && (
+
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+          }}
+        >
+
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "12px",
+              width: "320px",
+              boxShadow:
+                "0 10px 30px rgba(0,0,0,0.2)",
+              overflow: "hidden"
+            }}
+          >
+
+            <div
+              style={{
+                height: "20px",
+                background: "#7a5a3a"
+              }}
+            />
+
+            <div style={{ padding: "30px" }}>
+
+              <h2
+                style={{
+                  marginBottom: "20px",
+                  textAlign: "center",
+                  fontSize: "20px",
+                  fontWeight: "600"
+                }}
+              >
+                パスワードリセット
+              </h2>
+
+              <input
+                type="email"
+                placeholder="メールアドレス"
+                value={resetEmail}
+                onChange={(e) =>
+                  setResetEmail(
+                    e.target.value
+                  )
+                }
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  marginBottom: "16px",
+                  borderRadius: "6px",
+                  border: "1px solid #ccc",
+                  boxSizing: "border-box"
+                }}
+              />
+
+              {resetMessage && (
+
+                <p
+                  style={{
+                    color:
+                      resetMessage.startsWith(
+                        "エラー"
+                      )
+                        ? "red"
+                        : "green",
+                    fontSize: "13px",
+                    textAlign: "center",
+                    marginBottom: "15px"
+                  }}
+                >
+                  {resetMessage}
+                </p>
+
+              )}
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px"
+                }}
+              >
+
+                <button
+                  onClick={() => {
+
+                    setShowResetModal(false)
+
+                    setResetMessage("")
+
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    background: "#eee",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontWeight: "600"
+                  }}
+                >
+                  閉じる
+                </button>
+
+                <button
+                  onClick={async () => {
+
+                    if (!resetEmail) {
+
+                      setResetMessage(
+                        "メールアドレスを入力してください"
+                      )
+
+                      return
+                    }
+
+                    setResetLoading(true)
+
+                    setResetMessage("")
+
+                    const { error } =
+                      await supabase.auth
+                        .resetPasswordForEmail(
+                          resetEmail,
+                          {
+                            redirectTo:
+                              "https://ohyeah-admin.vercel.app/reset-password"
+                          }
+                        )
+
+                    if (error) {
+
+                      setResetMessage(
+                        "エラー: " +
+                        error.message
+                      )
+
+                    } else {
+
+                      setResetMessage(
+                        "リセットメールを送信しました"
+                      )
+
+                    }
+
+                    setResetLoading(false)
+
+                  }}
+                  disabled={resetLoading}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    background:
+                      resetLoading
+                        ? "#ccc"
+                        : "#7a5a3a",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor:
+                      resetLoading
+                        ? "not-allowed"
+                        : "pointer",
+                    fontWeight: "600"
+                  }}
+                >
+                  {resetLoading
+                    ? "送信中..."
+                    : "送信"}
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
 
     </div>
   );
@@ -535,6 +759,12 @@ function PasswordModal({
   onClose: () => void
 }) {
 
+  const [currentPassword, setCurrentPassword] =
+    useState("")
+
+  const [currentPasswordOk, setCurrentPasswordOk] =
+    useState<boolean | null>(null)
+
   const [newPassword, setNewPassword] =
     useState("")
 
@@ -548,7 +778,43 @@ function PasswordModal({
   const [showPassword, setShowPassword] =
     useState(false)
 
+  const checkCurrentPassword = async (
+    password: string
+  ) => {
+
+    setCurrentPassword(password)
+    setCurrentPasswordOk(null)
+
+    const {
+      data: { user }
+    } = await supabase.auth.getUser()
+
+    if (!user?.email || !password) {
+
+      setCurrentPasswordOk(null)
+
+      return
+    }
+
+    const { error } =
+      await supabase.auth.signInWithPassword({
+        email: user.email,
+        password
+      })
+
+    setCurrentPasswordOk(!error)
+  }
+
   const handleUpdate = async () => {
+
+    if (!currentPasswordOk) {
+
+      setMessage(
+        "エラー: 現在のパスワードが違います"
+      )
+
+      return
+    }
 
     if (!newPassword) {
 
@@ -559,10 +825,19 @@ function PasswordModal({
       return
     }
 
+    if (newPassword.length < 8) {
+
+      setMessage(
+        "エラー: 8文字以上で入力してください"
+      )
+
+      return
+    }
+
     if (newPassword !== confirmPassword) {
 
       setMessage(
-        "エラー: パスワードが一致しません"
+        "エラー: 新しいパスワードが一致していません"
       )
 
       return
@@ -594,6 +869,17 @@ function PasswordModal({
 
     setLoading(false)
   }
+
+  const isPasswordMatch =
+    confirmPassword &&
+    newPassword === confirmPassword
+
+  const isFormValid =
+    currentPasswordOk === true &&
+    newPassword.length >= 8 &&
+    isPasswordMatch
+
+  const canSave = !loading && isFormValid
 
   return (
 
@@ -639,6 +925,88 @@ function PasswordModal({
             パスワード変更
           </h2>
 
+          {/* 現在のパスワード */}
+
+          <div
+            style={{
+              position: "relative",
+              marginBottom: "16px"
+            }}
+          >
+
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="現在のパスワード"
+              value={currentPassword}
+              onChange={(e) =>
+                checkCurrentPassword(
+                  e.target.value
+                )
+              }
+              style={{
+                width: "100%",
+                padding: "10px 40px 10px 10px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+                boxSizing: "border-box"
+              }}
+            />
+
+            <span
+              onClick={() =>
+                setShowPassword(!showPassword)
+              }
+              style={{
+                position: "absolute",
+                right: "10px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                cursor: "pointer",
+                zIndex: 10,
+                fontSize: "14px"
+              }}
+            >
+              {showPassword ? "🙈" : "👁"}
+            </span>
+
+          </div>
+
+          {currentPassword && (
+
+            <div
+              style={{
+                fontSize: "12px",
+                marginTop: "-12px",
+                marginBottom: "12px",
+                textAlign: "left",
+                color:
+                  currentPasswordOk
+                    ? "#28a745"
+                    : "#dc3545",
+                fontWeight: "600"
+              }}
+            >
+
+              <span
+                style={{
+                  fontSize: "8px",
+                  verticalAlign: "middle",
+                  marginRight: "4px"
+                }}
+              >
+                ●
+              </span>
+
+              {currentPasswordOk
+                ? "現在のパスワードと一致しています"
+                : "現在のパスワードと違います"}
+
+            </div>
+
+          )}
+
+          {/* 新しいパスワード */}
+
           <div
             style={{
               position: "relative",
@@ -680,6 +1048,42 @@ function PasswordModal({
             </span>
 
           </div>
+
+          {newPassword && (
+
+            <div
+              style={{
+                fontSize: "12px",
+                marginTop: "-12px",
+                marginBottom: "12px",
+                textAlign: "left",
+                color:
+                  newPassword.length >= 8
+                    ? "#28a745"
+                    : "#dc3545",
+                fontWeight: "600"
+              }}
+            >
+
+              <span
+                style={{
+                  fontSize: "8px",
+                  verticalAlign: "middle",
+                  marginRight: "4px"
+                }}
+              >
+                ●
+              </span>
+
+              {newPassword.length >= 8
+                ? "8文字以上の条件を満たしています"
+                : "8文字以上で入力してください"}
+
+            </div>
+
+          )}
+
+          {/* 確認用 */}
 
           <div
             style={{
@@ -732,7 +1136,7 @@ function PasswordModal({
                 marginBottom: "12px",
                 textAlign: "left",
                 color:
-                  newPassword === confirmPassword
+                  isPasswordMatch
                     ? "#28a745"
                     : "#dc3545",
                 fontWeight: "600"
@@ -749,9 +1153,9 @@ function PasswordModal({
                 ●
               </span>
 
-              {newPassword === confirmPassword
-                ? "一致しています"
-                : "一致していません"}
+              {isPasswordMatch
+                ? "新しいパスワードと一致しています"
+                : "新しいパスワードと一致していません"}
 
             </div>
 
@@ -799,21 +1203,15 @@ function PasswordModal({
 
             <button
               onClick={handleUpdate}
-              disabled={loading}
+              disabled={!canSave}
               style={{
                 flex: 1,
                 padding: "10px",
-                background:
-                  loading
-                    ? "#ccc"
-                    : "#7a5a3a",
+                background: canSave ? "#7a5a3a" : "#ccc",
                 color: "#fff",
                 border: "none",
                 borderRadius: "6px",
-                cursor:
-                  loading
-                    ? "not-allowed"
-                    : "pointer",
+                cursor: canSave ? "pointer" : "not-allowed",
                 fontWeight: "600"
               }}
             >
