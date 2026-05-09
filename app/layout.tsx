@@ -21,6 +21,8 @@ export default function Layout({
 }) {
 
   const pathname = usePathname()
+  const isResetPasswordPage =
+  pathname === "/reset-password"
 
   const router = useRouter()
 
@@ -74,7 +76,8 @@ export default function Layout({
 
         <div style={{ position: "relative" }}>
 
-          {/* 通常レイアウト */}
+          {!isResetPasswordPage ? (
+
           <div>
 
             <div
@@ -345,6 +348,13 @@ export default function Layout({
             </div>
 
           </div>
+
+          ) : (
+
+            children
+
+          )}
+
 
           {/* モーダル */}
 
