@@ -20,6 +20,7 @@ type News = {
 export default function Page() {
   const [sliders, setSliders] = useState<SliderImage[]>([])
   const [newsList, setNewsList] = useState<News[]>([])
+  const [userData, setUserData] = useState<any>(null)
   const [targetSlider, setTargetSlider] = useState<SliderImage | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedNewsId, setSelectedNewsId] = useState<number | null>(null)
@@ -29,6 +30,7 @@ export default function Page() {
 
   useEffect(() => {
     load()
+    loadUser()
   }, [])
 
   const load = async () => {
@@ -44,6 +46,18 @@ export default function Page() {
       .select("id, title")
 
     if (newsData) setNewsList(newsData as News[])
+  }
+
+  const loadUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle()
+    setUserData(data)
   }
 
   const openEditModal = (slider: SliderImage) => {
@@ -81,7 +95,7 @@ export default function Page() {
         }
 
         const fileName = `${Date.now()}.webp`
-        const filePath = `slider/${fileName}` // ← フォルダ分け
+        const filePath = `slider-images/${fileName}` // ← フォルダ分け
 
         // 🔥 アップロード
         const { error: uploadError } = await supabase.storage
@@ -124,6 +138,18 @@ export default function Page() {
       if (error) {
         alert("DB更新失敗")
         return
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase
+          .from("activity_logs")
+          .insert({
+            user_id: user.id,
+            user_name: userData?.name,
+            action: "SLIDER_UPDATE",
+            target: "トップスライダー変更"
+          })
       }
 
       alert("保存しました")

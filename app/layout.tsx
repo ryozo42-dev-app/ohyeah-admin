@@ -408,22 +408,121 @@ function LoginModal({
 
   const handleLogin = async () => {
 
+    const cleanEmail = email.trim().toLowerCase()
+
     setLoading(true)
 
-    const { error } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
+    const { data: attempt, error: fetchError } =
+      await supabase
+        .from("login_attempts")
+        .select("*")
+        .eq("email", cleanEmail)
+        .maybeSingle()
 
-    if (error) {
+    if (fetchError) {
+      console.error("Fetch attempt error:", fetchError)
+      // RLSエラーなどで取得できない場合でも処理は続行させる（初回失敗扱いになる）
+    }
 
-      alert("ログイン失敗")
+    if (
+      attempt?.locked_until &&
+      new Date(attempt.locked_until) >
+        new Date()
+    ) {
+
+      alert(
+        "ログイン失敗回数が上限に達しました。\n15分後に再試行してください。"
+      )
 
       setLoading(false)
 
       return
     }
+
+    const { error } =
+      await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: password.trim()
+      })
+
+    if (error) {
+
+      const failedCount =
+        (attempt?.failed_count || 0) + 1
+
+      const lockUntil =
+        failedCount >= 5
+          ? new Date(
+              Date.now() +
+              15 * 60 * 1000
+            ).toISOString()
+      : ""
+
+      await supabase
+        .from("login_attempts")
+        .upsert(
+          {
+            email: cleanEmail,
+            failed_count: failedCount,
+            locked_until: lockUntil || null,
+            updated_at:
+              new Date().toISOString()
+          },
+          {
+            onConflict: "email"
+          }
+        )
+        .then(({ error }) => {
+          if (error) console.error("Upsert failed:", error)
+        })
+
+      await supabase
+        .from("activity_logs")
+        .insert({
+          action: "LOGIN_FAILED",
+          target: cleanEmail
+        })
+
+      if (failedCount >= 5) {
+
+        alert(
+          "ログイン失敗が5回に達しました。\n15分間ログインできません。"
+        )
+
+      } else {
+
+        alert(
+          `ログイン失敗 (${failedCount}/5)`
+        )
+
+      }
+
+      setLoading(false)
+
+      return
+    }
+
+    await supabase
+      .from("login_attempts")
+      .upsert(
+        {
+          email: cleanEmail,
+          failed_count: 0,
+          locked_until: null,
+          updated_at:
+            new Date().toISOString()
+        },
+        {
+          onConflict: "email"
+        }
+      )
+
+    await supabase
+      .from("activity_logs")
+      .insert({
+        action: "LOGIN_SUCCESS",
+        target: cleanEmail
+      })
 
     onLogin()
 
@@ -478,6 +577,7 @@ function LoginModal({
 
           <input
             placeholder="Email"
+            value={email}
             onChange={(e) => setEmail(e.target.value)}
             style={{
               width: "100%",
@@ -499,6 +599,7 @@ function LoginModal({
             <input
               type={showPassword ? "text" : "password"}
               placeholder="Password"
+              value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{
                 width: "100%",

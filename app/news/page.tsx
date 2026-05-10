@@ -17,6 +17,7 @@ type News = {
 
 type UserData = {
   id: string
+  name?: string
   role: string
 } | null
 
@@ -162,6 +163,18 @@ export default function Page() {
       await deleteImage(target.imageUrl)
     }
 
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase
+        .from("activity_logs")
+        .insert({
+          user_id: user.id,
+          user_name: userData?.name,
+          action: "NEWS_DELETE",
+          target: target?.title || String(id)
+        })
+    }
+
     if (!data || data.length === 0) {
       console.warn("削除対象が見つかりませんでした。RLSポリシーまたはIDの型を確認してください。")
     }
@@ -194,6 +207,19 @@ export default function Page() {
     }
 
     load()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase
+        .from("activity_logs")
+        .insert({
+          user_id: user.id,
+          user_name: userData?.name,
+          action: "NEWS_DELETE",
+          target: `一括削除: ${selected.length}件`
+        })
+    }
+
     setSelected([])
   }
 
@@ -279,6 +305,18 @@ export default function Page() {
 
   await load()
 
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await supabase
+      .from("activity_logs")
+      .insert({
+        user_id: user.id,
+        user_name: userData?.name,
+        action: "NEWS_CREATE",
+        target: newNews.title
+      })
+  }
+
   setShowAdd(false)
 
   setNewNews({
@@ -324,6 +362,18 @@ export default function Page() {
       }
 
       await load()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase
+          .from("activity_logs")
+          .insert({
+            user_id: user.id,
+            user_name: userData?.name,
+            action: "NEWS_UPDATE",
+            target: `画像変更: ${targetNews.title}`
+          })
+      }
 
       setTargetNews({
         ...targetNews,
@@ -382,6 +432,19 @@ export default function Page() {
       }
 
       await load()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase
+          .from("activity_logs")
+          .insert({
+            user_id: user.id,
+            user_name: userData?.name,
+            action: "NEWS_UPDATE",
+            target: editNews.title
+          })
+      }
+
       setShowEdit(false)
       setEditImage(null)
       setPreview(null)
@@ -561,6 +624,18 @@ export default function Page() {
                       alert("更新失敗")
                       setUpdatingId(null)
                       return
+                    }
+
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (user) {
+                      await supabase
+                        .from("activity_logs")
+                        .insert({
+                          user_id: user.id,
+                          user_name: userData?.name,
+                          action: "NEWS_UPDATE",
+                          target: `公開設定変更: ${item.title} (${value ? "公開" : "非公開"})`
+                        })
                     }
 
                     setNews(news.map(n =>

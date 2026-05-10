@@ -205,7 +205,7 @@ export default function Foods() {
       const oldImageUrl = targetFood.image_url
       const newImageUrl = await uploadImage(
         selectedFile,
-        "food"
+        "food-images"
       )
 
       const { error: updateError } = await supabase
@@ -220,6 +220,18 @@ export default function Foods() {
 
       if (oldImageUrl) {
         await deleteImage(oldImageUrl)
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase
+          .from("activity_logs")
+          .insert({
+            user_id: user.id,
+            user_name: userData?.name,
+            action: "FOOD_UPDATE",
+            target: `画像変更: ${targetFood.name}`
+          })
       }
 
       fetchFoods()
@@ -245,7 +257,7 @@ export default function Foods() {
       if (selectedFile) {
         imageUrl = await uploadImage(
           selectedFile,
-          "food"
+          "food-images"
         )
       }
 
@@ -269,6 +281,18 @@ export default function Foods() {
 
       if (selectedFile && oldImageUrl) {
         await deleteImage(oldImageUrl)
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase
+          .from("activity_logs")
+          .insert({
+            user_id: user.id,
+            user_name: userData?.name,
+            action: "FOOD_UPDATE",
+            target: editFood.name
+          })
       }
 
       fetchFoods()
@@ -301,6 +325,18 @@ export default function Foods() {
       await deleteImage(target.image_url)
     }
 
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase
+        .from("activity_logs")
+        .insert({
+          user_id: user.id,
+          user_name: userData?.name,
+          action: "FOOD_DELETE",
+          target: target?.name || id
+        })
+    }
+
     fetchFoods()
   }
 
@@ -319,7 +355,7 @@ export default function Foods() {
     try {
       const imageUrl = await uploadImage(
         selectedFile,
-        "food"
+        "food-images"
       )
 
       const { data, error } = await supabase
@@ -343,6 +379,18 @@ export default function Foods() {
       }
 
       await fetchFoods()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase
+          .from("activity_logs")
+          .insert({
+            user_id: user.id,
+            user_name: userData?.name,
+            action: "FOOD_CREATE",
+            target: newFood.name
+          })
+      }
 
       setNewFood({
         name: "",
@@ -410,6 +458,18 @@ export default function Foods() {
       return
     }
 
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase
+        .from("activity_logs")
+        .insert({
+          user_id: user.id,
+          user_name: userData?.name,
+          action: "FOOD_DELETE",
+          target: `一括削除: ${selected.length}件`
+        })
+    }
+
     fetchFoods()
     setSelected([])
   }
@@ -428,6 +488,18 @@ export default function Foods() {
     if (error) {
       console.error("UPDATE ERROR:", error)
       return
+    }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase
+        .from("activity_logs")
+        .insert({
+          user_id: user.id,
+          user_name: userData?.name,
+          action: "FOOD_UPDATE",
+          target: `一括価格変更: ${selected.length}件 -> ¥${price}`
+        })
     }
 
     fetchFoods()
@@ -456,6 +528,18 @@ export default function Foods() {
     if (bulkUpdateError) {
       console.error("UPDATE ERROR:", bulkUpdateError)
       return
+    }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase
+        .from("activity_logs")
+        .insert({
+          user_id: user.id,
+          user_name: userData?.name,
+          action: "FOOD_UPDATE",
+          target: `一括カテゴリー変更: ${selected.length}件 -> ${bulkCategory}`
+        })
     }
 
     fetchFoods()
@@ -656,6 +740,18 @@ export default function Foods() {
                     if (error) {
                       alert("更新失敗")
                       return
+                    }
+
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (user) {
+                      await supabase
+                        .from("activity_logs")
+                        .insert({
+                          user_id: user.id,
+                          user_name: userData?.name,
+                          action: "FOOD_UPDATE",
+                          target: `表示設定変更: ${food.name} (${checked ? "表示" : "非表示"})`
+                        })
                     }
 
                     // UI更新（即反映）
