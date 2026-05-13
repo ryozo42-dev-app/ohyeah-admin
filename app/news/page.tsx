@@ -7,11 +7,24 @@ import { deleteImage } from "@/lib/deleteImage"
 
 type News = {
   id: number
-  title: string
-  body: string
+
+  title_ja: string
+  body_ja: string
+
+  title_en?: string
+  body_en?: string
+
+  title_zh?: string
+  body_zh?: string
+
+  title_ko?: string
+  body_ko?: string
+
   imageUrl?: string
+
   createdAt?: Date | null
   date?: Date | null
+
   isPublished: boolean
 }
 
@@ -43,8 +56,8 @@ export default function Page() {
   const [updatingId, setUpdatingId] = useState<number | null>(null)
 
   const [newNews, setNewNews] = useState({
-    title: "",
-    body: "",
+    title_ja: "",
+    body_ja: "",
     imageUrl: "",
     isPublished: true
   })
@@ -53,6 +66,8 @@ export default function Page() {
   const [previewAdd, setPreviewAdd] = useState<string | null>(null)
 
   const [editImage, setEditImage] = useState<File | null>(null)
+  const [isTranslating, setIsTranslating] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
 
   /* -------------------------
@@ -61,9 +76,9 @@ export default function Page() {
 
   const load = async () => {
     const { data, error } = await supabase
-      .from("news")
+      .from("world_news")
       .select("*")
-      .order("createdAt", { ascending: false })
+      .order("createdat", { ascending: false })
 
     if (error) {
       console.error(error)
@@ -72,12 +87,18 @@ export default function Page() {
 
     const list: News[] = (data || []).map((d: any) => ({
       id: d.id,
-      title: d.title || "",
-      body: d.body || "",
-      imageUrl: d.imageUrl || "",
-      createdAt: d.createdAt ? new Date(d.createdAt) : null,
+      title_ja: d.title_ja || d.title || "",
+      body_ja: d.body_ja || d.body || "",
+      title_en: d.title_en || "",
+      body_en: d.body_en || "",
+      title_zh: d.title_zh || "",
+      body_zh: d.body_zh || "",
+      title_ko: d.title_ko || "",
+      body_ko: d.body_ko || "",
+      imageUrl: d.imageUrl || d.imageurl || "",
+      createdAt: d.createdat ? new Date(d.createdat) : null,
       date: d.date ? new Date(d.date) : null,
-      isPublished: d.isPublished ?? true
+      isPublished: d.ispublished ?? d.isPublished ?? true
     }))
 
     setNews(list)
@@ -146,7 +167,7 @@ export default function Page() {
     const target = news.find(n => n.id === id)
 
     const { data, error } = await supabase
-      .from("news")
+      .from("world_news")
       .delete()
       .eq("id", id)
       .select()
@@ -171,7 +192,7 @@ export default function Page() {
           user_id: user.id,
           user_name: userData?.name,
           action: "NEWS_DELETE",
-          target: target?.title || String(id)
+          target: target?.title_ja || String(id)
         })
     }
 
@@ -193,7 +214,7 @@ export default function Page() {
     console.log("🔥 BULK DELETE:", selected)
 
     const { data, error } = await supabase
-      .from("news")
+      .from("world_news")
       .delete()
       .in("id", selected)
       .select()
@@ -229,10 +250,12 @@ export default function Page() {
 
   const addNews = async () => {
 
-  if (!newNews.title.trim()) {
+  if (!newNews.title_ja.trim()) {
     alert("タイトルを入力してください")
     return
   }
+
+  setIsSaving(true)
 
   let imageUrl = ""
 
@@ -245,18 +268,19 @@ export default function Page() {
   } catch (err) {
 
     console.error(err)
+    setIsSaving(false)
     alert("画像アップロード失敗")
     return
 
   }
 
   const { data, error } = await supabase
-    .from("news")
+    .from("world_news")
     .insert({
-      title: newNews.title,
-      body: newNews.body,
-      imageUrl,
-      isPublished: newNews.isPublished,
+      title_ja: newNews.title_ja,
+      body_ja: newNews.body_ja,
+      imageurl: imageUrl,
+      ispublished: newNews.isPublished,
       createdAt: new Date().toISOString()
     })
     .select()
@@ -266,6 +290,7 @@ export default function Page() {
   console.log("INSERT ERROR:", error)
 
   if (error || !data) {
+    setIsSaving(false)
 
     alert("投稿失敗")
     console.error(error)
@@ -287,7 +312,7 @@ export default function Page() {
 
       body: JSON.stringify({
         title: "新着ニュース",
-        message: newNews.title,
+        message: newNews.title_ja,
         newsId: data.id
       })
 
@@ -313,21 +338,23 @@ export default function Page() {
         user_id: user.id,
         user_name: userData?.name,
         action: "NEWS_CREATE",
-        target: newNews.title
+        target: newNews.title_ja
       })
   }
 
   setShowAdd(false)
 
   setNewNews({
-    title: "",
-    body: "",
+    title_ja: "",
+    body_ja: "",
     imageUrl: "",
     isPublished: true
   })
 
   setNewImageFile(null)
   setPreviewAdd(null)
+
+  setIsSaving(false)
   }
 
   /* -------------------------
@@ -346,8 +373,8 @@ export default function Page() {
       const imageUrl = await uploadImage(file)
 
       const { error } = await supabase
-        .from("news")
-        .update({ imageUrl })
+        .from("world_news")
+        .update({ imageurl: imageUrl })
         .eq("id", targetNews.id)
 
       if (error) {
@@ -371,7 +398,7 @@ export default function Page() {
             user_id: user.id,
             user_name: userData?.name,
             action: "NEWS_UPDATE",
-            target: `画像変更: ${targetNews.title}`
+            target: `画像変更: ${targetNews.title_ja}`
           })
       }
 
@@ -396,9 +423,60 @@ export default function Page() {
   edit
   ------------------------- */
 
+  const handleTranslate = async () => {
+
+    if (!editNews) return
+    setIsTranslating(true)
+
+    try {
+
+      const res = await fetch(
+        "https://ikezocnvlrhluxhxwfug.supabase.co/functions/v1/translate-news",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            title: editNews.title_ja,
+            body: editNews.body_ja,
+          }),
+        }
+      )
+
+      const data = await res.json()
+
+      setEditNews({
+        ...editNews,
+
+        title_en: data.title_en,
+        body_en: data.body_en,
+
+        title_zh: data.title_zh,
+        body_zh: data.body_zh,
+
+        title_ko: data.title_ko,
+        body_ko: data.body_ko,
+      })
+
+    } catch (err) {
+
+      console.error(err)
+
+      alert("翻訳失敗")
+
+    } finally {
+      setIsTranslating(false)
+    }
+
+  }
+
   const saveEdit = async () => {
     if (!editNews?.id) return
 
+    setIsSaving(true)
     setUpdatingId(editNews.id)
 
     try {
@@ -411,18 +489,24 @@ export default function Page() {
       }
 
       const { error } = await supabase
-        .from("news")
+        .from("world_news")
         .update({
-          title: editNews.title,
-          body: editNews.body,
-          imageUrl, // ここで更新されたimageUrlを使用
-          isPublished: editNews.isPublished
+          title_ja: editNews.title_ja,
+          body_ja: editNews.body_ja,
+          title_en: editNews.title_en || "",
+          body_en: editNews.body_en || "",
+          title_zh: editNews.title_zh || "",
+          body_zh: editNews.body_zh || "",
+          title_ko: editNews.title_ko || "",
+          body_ko: editNews.body_ko || "",
+          imageurl: imageUrl,
+          ispublished: editNews.isPublished
         })
         .eq("id", editNews.id)
 
       if (error) {
         console.error(error)
-        alert("更新失敗")
+        alert(`更新失敗: ${error.message || '不明なエラー'}`)
         setUpdatingId(null)
         return
       }
@@ -441,7 +525,7 @@ export default function Page() {
             user_id: user.id,
             user_name: userData?.name,
             action: "NEWS_UPDATE",
-            target: editNews.title
+            target: editNews.title_ja
           })
       }
 
@@ -452,11 +536,12 @@ export default function Page() {
     } catch (err) {
 
       console.error(err)
-      alert("画像アップロード失敗")
+      alert(`保存処理中にエラーが発生しました: ${err instanceof Error ? err.message : String(err)}`)
 
     } finally {
 
       setUpdatingId(null)
+      setIsSaving(false)
 
     }
   }
@@ -575,7 +660,7 @@ export default function Page() {
                   textOverflow: "ellipsis"
                 }}
               >
-                {item.title}
+                {item.title_ja}
               </td>
               <td
                 style={{
@@ -588,7 +673,7 @@ export default function Page() {
                   whiteSpace: "nowrap"
                 }}
               >
-                {item.body}
+                {item.body_ja}
               </td>
 
               <td
@@ -614,8 +699,8 @@ export default function Page() {
                     setUpdatingId(item.id)  // ← ロック開始
 
                     const { error } = await supabase
-                      .from("news")
-                      .update({ "isPublished": value })
+                      .from("world_news")
+                      .update({ "ispublished": value })
                       .eq("id", item.id)
 
                     console.log("update error:", error)
@@ -634,7 +719,7 @@ export default function Page() {
                           user_id: user.id,
                           user_name: userData?.name,
                           action: "NEWS_UPDATE",
-                          target: `公開設定変更: ${item.title} (${value ? "公開" : "非公開"})`
+                          target: `公開設定変更: ${item.title_ja} (${value ? "公開" : "非公開"})`
                         })
                     }
 
@@ -780,7 +865,52 @@ export default function Page() {
       {/* 新規投稿モーダル */}
       {showAdd && (
         <div className="modalOverlay">
-          <div className="modalContent" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="modalContent" style={{
+            padding: 0,
+            overflow: "hidden",
+            width: "62vw",
+            maxWidth: "1060px",
+            minWidth: "930px",
+            maxHeight: "90vh",
+            overflowY: "auto"
+          }}>
+            {/* 保存中のオーバーレイ表示 */}
+            {isSaving && (
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                backgroundColor: "rgba(255, 255, 255, 0.7)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 100,
+                animation: "fadeIn 0.3s ease"
+              }}>
+                <div className="loader" />
+                <p style={{
+                  marginTop: "16px",
+                  color: "#8B5E3C",
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                  letterSpacing: "0.1em"
+                }}>保存中...</p>
+                <style>{`
+                  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                  .loader {
+                    width: 40px;
+                    height: 40px;
+                    border: 3px solid #f3f3f3;
+                    border-top: 3px solid #8B5E3C;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                  }
+                  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                `}</style>
+              </div>
+            )}
+
             <div
               style={{
                 height: "18px",
@@ -801,16 +931,16 @@ export default function Page() {
                 <label>タイトル</label>
                 <input
                   type="text"
-                  value={newNews.title}
-                  onChange={(e) => setNewNews({ ...newNews, title: e.target.value })}
+                  value={newNews.title_ja}
+                  onChange={(e) => setNewNews({ ...newNews, title_ja: e.target.value })}
                 />
               </div>
               <div className="modalField">
                 <label>本文</label>
                 <textarea
-                  rows={5}
-                  value={newNews.body}
-                  onChange={(e) => setNewNews({ ...newNews, body: e.target.value })}
+                  rows={10}
+                  value={newNews.body_ja}
+                  onChange={(e) => setNewNews({ ...newNews, body_ja: e.target.value })}
                 />
               </div>
 
@@ -871,7 +1001,55 @@ export default function Page() {
       {/* 編集モーダル */}
       {showEdit && editNews && (
         <div className="modalOverlay">
-          <div className="modalContent" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="modalContent" style={{
+            padding: 0,
+            overflow: "hidden",
+            width: "62vw",
+            maxWidth: "1060px",
+            minWidth: "930px",
+            position: "relative",
+            maxHeight: "90vh",
+            overflowY: "auto",
+          }}>
+            {/* 翻訳中・保存中のオーバーレイ表示 */}
+            {(isTranslating || isSaving) && (
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                backgroundColor: "rgba(255, 255, 255, 0.7)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 100,
+                animation: "fadeIn 0.3s ease"
+              }}>
+                <div className="loader" />
+                <p style={{
+                  marginTop: "16px",
+                  color: "#8B5E3C",
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                  letterSpacing: "0.1em"
+                }}>
+                  {isTranslating ? "翻訳中..." : "保存中..."}
+                </p>
+                <style>{`
+                  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                  .loader {
+                    width: 40px;
+                    height: 40px;
+                    border: 3px solid #f3f3f3;
+                    border-top: 3px solid #8B5E3C;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                  }
+                  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                `}</style>
+              </div>
+            )}
+
             <div
               style={{
                 height: "18px",
@@ -889,22 +1067,116 @@ export default function Page() {
                 ニュース編集
               </h2>
 
-              <div className="modalField">
-                <label>タイトル</label>
-                <input
-                  type="text"
-                  value={editNews.title}
-                  onChange={(e) => setEditNews({ ...editNews, title: e.target.value })}
-                />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: "12px",
+                  marginTop: "10px",
+                  marginBottom: "4px"
+                }}
+              >
+                <div className="modalField">
+                  <label>タイトル</label>
+                  <input
+                    type="text"
+                    value={editNews.title_ja}
+                    onChange={(e) => setEditNews({ ...editNews, title_ja: e.target.value })}
+                    style={{
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                      border: "1px solid #ccc",
+                      background: "#fff"
+                    }}
+                  />
+                </div>
+
+                <div className="modalField">
+                  <label>English Title</label>
+
+                  <input
+                    type="text"
+                    value={editNews.title_en || ""}
+                    disabled
+                  />
+                </div>
+
+                <div className="modalField">
+                  <label>繁體中文 Title</label>
+
+                  <input
+                    type="text"
+                    value={editNews.title_zh || ""}
+                    disabled
+                  />
+                </div>
+
+                <div className="modalField">
+                  <label>한국어 Title</label>
+
+                  <input
+                    type="text"
+                    value={editNews.title_ko || ""}
+                    disabled
+                  />
+                </div>
               </div>
 
-              <div className="modalField">
-                <label>本文</label>
-                <textarea
-                  rows={5}
-                  value={editNews.body}
-                  onChange={(e) => setEditNews({ ...editNews, body: e.target.value })}
-                />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: "12px",
+                  marginTop: "0"
+                }}
+              >
+                <div className="modalField">
+                  <label>本文</label>
+                  <textarea
+                    rows={10}
+                    value={editNews.body_ja}
+                    onChange={(e) => setEditNews({ ...editNews, body_ja: e.target.value })}
+                    style={{
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                      border: "1px solid #ccc",
+                      background: "#fff"
+                    }}
+                  />
+                  <div style={{ textAlign: "center", marginTop: "8px" }}>
+                    <button onClick={handleTranslate}>
+                      多言語へ反映
+                    </button>
+                  </div>
+                </div>
+
+                <div className="modalField">
+                  <label>English Body</label>
+
+                  <textarea
+                    rows={10}
+                    value={editNews.body_en || ""}
+                    disabled
+                  />
+                </div>
+
+                <div className="modalField">
+                  <label>繁體中文 Body</label>
+
+                  <textarea
+                    rows={10}
+                    value={editNews.body_zh || ""}
+                    disabled
+                  />
+                </div>
+
+                <div className="modalField">
+                  <label>한국어 Body</label>
+
+                  <textarea
+                    rows={10}
+                    value={editNews.body_ko || ""}
+                    disabled
+                  />
+                </div>
               </div>
 
               <div className="modalField">
@@ -931,8 +1203,13 @@ export default function Page() {
                 >
                   キャンセル
                 </button>
-                <button onClick={saveEdit} disabled={updatingId === editNews.id}>
-                  {updatingId === editNews.id ? "保存中..." : "保存"}
+                <button
+                  onClick={saveEdit}
+                  disabled={updatingId === editNews.id}
+                >
+                  {updatingId === editNews.id
+                    ? "保存中..."
+                    : "保存"}
                 </button>
               </div>
             </div>
