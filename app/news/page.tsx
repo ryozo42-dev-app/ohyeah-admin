@@ -258,6 +258,14 @@ export default function Page() {
   setIsSaving(true)
 
   let imageUrl = ""
+  let translated = {
+    title_en: "",
+    body_en: "",
+    title_zh: "",
+    body_zh: "",
+    title_ko: "",
+    body_ko: ""
+  }
 
   try {
 
@@ -265,23 +273,56 @@ export default function Page() {
       imageUrl = await uploadImage(newImageFile)
     }
 
+    // 翻訳API呼び出しのtry-catchブロック
+    try {
+      const translateRes = await fetch(
+        "https://ikezocnvlrhluxhxwfug.supabase.co/functions/v1/translate-news",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: newNews.title_ja,
+            body: newNews.body_ja,
+          }),
+        }
+      )
+
+      if (translateRes.ok) {
+        translated = await translateRes.json()
+      } else {
+        const errorText = await translateRes.text()
+        console.error("Translation API returned an error:", translateRes.status, errorText)
+        // 翻訳失敗しても、日本語データで保存を続行するため、translatedは初期値の空文字列のまま
+      }
+    } catch (translationError) {
+      console.error("Failed to call translation API or parse response:", translationError)
+      // 翻訳失敗しても、日本語データで保存を続行するため、translatedは初期値の空文字列のまま
+    }
+
   } catch (err) {
 
     console.error(err)
     setIsSaving(false)
-    alert("画像アップロード失敗")
+    alert(`初期処理中にエラーが発生しました: ${err instanceof Error ? err.message : String(err)}`)
     return
 
   }
-
   const { data, error } = await supabase
     .from("world_news")
     .insert({
       title_ja: newNews.title_ja,
       body_ja: newNews.body_ja,
+      title_en: translated.title_en,
+      body_en: translated.body_en,
+      title_zh: translated.title_zh,
+      body_zh: translated.body_zh,
+      title_ko: translated.title_ko,
+      body_ko: translated.body_ko,
       imageurl: imageUrl,
       ispublished: newNews.isPublished,
-      createdAt: new Date().toISOString()
+      createdat: new Date().toISOString()
     })
     .select()
     .single()
@@ -292,8 +333,7 @@ export default function Page() {
   if (error || !data) {
     setIsSaving(false)
 
-    alert("投稿失敗")
-    console.error(error)
+    alert(JSON.stringify(error))
     return
 
   }
