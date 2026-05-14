@@ -63,22 +63,22 @@ export default function Dashboard() {
       .select("*", { count: "exact", head: true })
 
     const { count: foods } = await supabase
-      .from("menu_foods")
+      .from("world_foods")
       .select("*", { count: "exact", head: true })
 
     const { count: news } = await supabase
-      .from("news")
+      .from("world_news")
       .select("*", { count: "exact", head: true })
 
     const { count: publishedNews } = await supabase
-      .from("news")
+      .from("world_news")
       .select("*", { count: "exact", head: true })
-      .eq("isPublished", true)
+      .eq("ispublished", true)
 
     const { data: latest } = await supabase
-      .from("news")
+      .from("world_news")
       .select("*")
-      .order("createdAt", { ascending: false })
+      .order("createdat", { ascending: false })
       .limit(3)
 
     setStats({
@@ -122,9 +122,9 @@ export default function Dashboard() {
             padding: "10px",
             borderBottom: "1px solid #ccc"
           }}>
-            <strong>{n.title}</strong>
+            <strong>{n.title_ja}</strong>
             <div style={{ fontSize: "12px", color: "#666" }}>
-              {n.createdAt}
+              {n.createdat}
             </div>
           </div>
         ))}

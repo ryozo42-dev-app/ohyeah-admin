@@ -908,9 +908,9 @@ export default function Page() {
           <div className="modalContent" style={{
             padding: 0,
             overflow: "hidden",
-            width: "62vw",
-            maxWidth: "1060px",
-            minWidth: "930px",
+            width: "31vw",
+            maxWidth: "530px",
+            minWidth: "465px",
             maxHeight: "90vh",
             overflowY: "auto"
           }}>
