@@ -59,7 +59,7 @@ export default function Dashboard() {
     setUserEmail(user?.email || "")
 
     const { count: drinks } = await supabase
-      .from("menu_drinks")
+      .from("world_drinks")
       .select("*", { count: "exact", head: true })
 
     const { count: foods } = await supabase
@@ -117,14 +117,14 @@ export default function Dashboard() {
       <div>
         <h2 style={{ marginBottom: "10px" }}>最新News</h2>
 
-        {latestNews.map(n => (
-          <div key={n.id} style={{
+        {latestNews.map(item => (
+          <div key={item.id} style={{
             padding: "10px",
             borderBottom: "1px solid #ccc"
           }}>
-            <strong>{n.title_ja}</strong>
+            <strong>{item.title_ja}</strong>
             <div style={{ fontSize: "12px", color: "#666" }}>
-              {n.createdat}
+              {item.createdat}
             </div>
           </div>
         ))}

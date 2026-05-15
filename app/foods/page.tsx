@@ -50,6 +50,7 @@ export default function Foods() {
   const [uploading, setUploading] = useState(false)
   const [isTranslating, setIsTranslating] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
   const [showEditAddCategory, setShowEditAddCategory] = useState(false)
   const [showImageModal, setShowImageModal] = useState(false)
   const [targetFood, setTargetFood] = useState<any>(null)
@@ -336,14 +337,20 @@ export default function Foods() {
       }
 
       fetchFoods()
-      setShowEdit(false)
+      setIsSaved(true)
+      setTimeout(() => {
+        setIsSaved(false)
+        setIsSaving(false)
+        setShowEdit(false)
+      }, 1000)
+
       setSelectedFile(null)
       setPreviewImage(null)
     } catch (error: any) {
       alert(error.message || String(error));
+      setIsSaving(false)
     } finally {
       setUploading(false)
-      setIsSaving(false)
     }
   }
 
@@ -419,6 +426,8 @@ export default function Foods() {
 
       if (error) {
         alert(error.message)
+        setIsSaving(false)
+        setUploading(false)
         return
       }
 
@@ -450,9 +459,14 @@ export default function Foods() {
 
       setSelectedFile(null)
       setPreviewImage(null)
-      setShowAdd(false)
+      setIsSaved(true)
 
-      alert("登録完了")
+      setTimeout(() => {
+        setIsSaved(false)
+        setIsSaving(false)
+        setShowAdd(false)
+      }, 1000)
+
     } catch (e) {
       console.error(e)
       alert("登録失敗")
@@ -629,14 +643,20 @@ export default function Foods() {
   }
 
   const exportCSV = () => {
-    const header = ["名前", "英語名", "カテゴリー", "説明", "価格"]
+    const header = ["id", "name_ja", "name_en", "name_zh", "name_ko", "foodcategory", "description", "price", "imageurl", "isactive", "displayorder"]
 
     const rows = foods.map(f => [
+      f.id,
       f.name_ja,
-      f.name_en,
-      f.foodcategory,
+      f.name_en || "",
+      f.name_zh || "",
+      f.name_ko || "",
+      f.foodcategory || "",
       f.description || "",
-      f.price
+      f.price,
+      f.imageurl || "",
+      f.isactive,
+      f.displayorder || 0
     ])
 
     const csv = [header.join(","), ...rows.map(r => r.join(","))].join("\n")
@@ -652,6 +672,18 @@ export default function Foods() {
 
   return (
     <div className="page" style={{ padding: "20px 30px" }}>
+      <style>{`
+        /* 価格欄の上下ボタン（スピンボタン）を非表示にする */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type=number] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
+
       <h1 style={{ textAlign: "center", margin: "0 0 10px", fontSize: "35px" }}>
         Food管理
       </h1>
@@ -1075,7 +1107,7 @@ export default function Foods() {
             }}
           >
             {/* 翻訳中・保存中のオーバーレイ表示 */}
-            {(isTranslating || isSaving) && (
+            {(isTranslating || isSaving || isSaved) && (
               <div style={{
                 position: "absolute",
                 inset: 0,
@@ -1096,7 +1128,7 @@ export default function Foods() {
                   fontSize: "14px",
                   letterSpacing: "0.1em"
                 }}>
-                  {isTranslating ? "翻訳中..." : "保存中..."}
+                  {isTranslating ? "翻訳中..." : (isSaved ? "保存済み！" : "保存中...")}
                 </p>
                 <style>{`
                   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1290,7 +1322,7 @@ export default function Foods() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 1fr 140px",
+                  gridTemplateColumns: "200px 1fr 140px",
                   gap: "10px",
                   marginTop: "18px",
                 }}
@@ -1474,175 +1506,209 @@ export default function Foods() {
 
       {/* 新規追加モーダル */}
       {showAdd && (
-        <div style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          background: "rgba(0,0,0,0.4)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}>
-          <div style={{
-            background: "#fff",
-            padding: "20px",
-            borderRadius: "8px",
-            width: "400px"
+        <div className="modalOverlay">
+          <div className="modalContent" style={{
+            width: "92vw",
+            maxWidth: "680px",
+            borderRadius: "14px",
+            overflow: "hidden",
+            padding: 0,
+            position: "relative",
           }}>
-            <div
-              style={{
-                height: "18px",
-                background: "#8B5E3C",
-                borderTopLeftRadius: "8px",
-                borderTopRightRadius: "8px",
-                margin: "-20px -20px 20px -20px",
-              }}
-            />
-
-            <h2
-              style={{
-                textAlign: "center",
-                marginBottom: "24px",
-              }}
-            >
-              フード追加
-            </h2>
-
-            <input
-              placeholder="名前"
-              value={newFood.name_ja}
-              onChange={(e)=>setNewFood({...newFood, name_ja:e.target.value})}
-              style={{ width:"100%", marginBottom:"6px" }}
-            />
-
-            <input
-              placeholder="英語名"
-              value={newFood.name_en}
-              onChange={(e)=>setNewFood({...newFood, name_en:e.target.value})}
-              style={{ width:"100%", marginBottom:"6px" }}
-            />
-
-            <select
-              value={newFood.foodcategory}
-              onChange={(e) => {
-                if (e.target.value === "__add__") {
-                  setShowAddCategory(true)
-                  return
-                }
-                setNewFood({ ...newFood, foodcategory: e.target.value })
-              }}
-              style={{ width: "100%", marginBottom: "6px" }}
-            >
-              <option value="">カテゴリーを選択</option>
-              <option value="__add__">＋ カテゴリー追加</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-
-            {showAddCategory && (
+            {/* 翻訳中・保存中のオーバーレイ */}
+            {(isTranslating || isSaving || isSaved) && (
               <div style={{
-                marginTop: "10px",
-                padding: "10px",
-                background: "#f9f9f9",
-                borderRadius: "4px",
-                border: "1px solid #ddd"
+                position: "absolute",
+                inset: 0,
+                backgroundColor: "rgba(255, 255, 255, 0.7)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 100,
               }}>
-                <input
-                  placeholder="新しいカテゴリー名"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  style={{ width: "100%", marginBottom: "6px" }}
-                />
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                  <button style={{ fontSize: "11px" }} onClick={() => setShowAddCategory(false)}>キャンセル</button>
-                  <button style={{ fontSize: "11px" }} onClick={async () => {
-                    const newCat = await handleAddCategory(newCategoryName);
-                    if (newCat) {
-                      setNewFood({ ...newFood, foodcategory: newCat });
-                    }
-                    setShowAddCategory(false);
-                  }}>追加</button>
-                </div>
+                <div className="loader" />
+                <p style={{ marginTop: "16px", color: "#8B5E3C", fontWeight: "bold" }}>
+                  {isTranslating ? "翻訳中..." : (isSaved ? "登録済み！" : "保存中...")}
+                </p>
+                <style>{`
+                  .loader {
+                    width: 40px;
+                    height: 40px;
+                    border: 3px solid #f3f3f3;
+                    border-top: 3px solid #8B5E3C;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                  }
+                  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                `}</style>
               </div>
             )}
 
-            <input
-              placeholder="説明"
-              value={newFood.description}
-              onChange={(e)=>setNewFood({...newFood, description:e.target.value})}
-              style={{ width:"100%", marginBottom:"6px" }}
-            />
+            <div style={{ height: "14px", background: "#8B5E3C" }} />
 
-            <input
-              type="number"
-              placeholder="価格"
-              value={newFood.price}
-              onChange={(e)=>setNewFood({...newFood, price:e.target.value})}
-              style={{ width:"100%", marginBottom:"10px" }}
-            />
+            <div style={{ padding: "22px" }}>
+              <h2 style={{ textAlign: "center", fontSize: "34px", marginBottom: "22px", fontWeight: "bold" }}>
+                Food追加
+              </h2>
 
-            <div style={{ marginBottom: "10px" }}>
-              <label style={{ display: "block", fontSize: "11px", marginBottom: "4px" }}>画像</label>
-              {(previewImage || newFood?.imageurl) && (
-                <img
-                  src={previewImage || newFood.imageurl || ""}
-                  alt="preview"
-                  style={{
-                    width: "80px",
-                    height: "80px",
-                    objectFit: "cover",
-                    marginTop: "8px"
-                  }}
-                />
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={onFileChange}
-                style={{ display: "block", fontSize: "11px", width: "200px", marginTop: "4px" }}
-              />
-              {newFood.imageurl && (
-                <button
-                  style={{ fontSize: "10px", marginTop: "4px", display: "block" }}
-                  onClick={() => setNewFood({ ...newFood, imageurl: "" })}
-                >
-                  画像を削除
-                </button>
-              )}
-              {uploading && <span style={{ fontSize: "10px", color: "#666", marginLeft: "8px" }}>アップロード中...</span>}
+              {/* 多言語エリア */}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 250px)",
+                gap: "30px",
+                justifyContent: "center",
+                maxWidth: "580px",
+                margin: "0 auto",
+              }}>
+                {/* 日本語 */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>日本語</label>
+                  <input
+                    type="text"
+                    value={newFood.name_ja}
+                    onChange={(e) => setNewFood({ ...newFood, name_ja: e.target.value })}
+                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc" }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
+                    <button
+                      onClick={async () => {
+                        setIsTranslating(true);
+                        try {
+                          const res = await fetch("https://ikezocnvlrhluxhxwfug.supabase.co/functions/v1/translate-news", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ title: newFood.name_ja, body: newFood.description || "" }),
+                          });
+                          const data = await res.json();
+                          setNewFood({ ...newFood, name_en: data.title_en, name_zh: data.title_zh, name_ko: data.title_ko });
+                        } catch (err) {
+                          alert("翻訳失敗");
+                        } finally {
+                          setIsTranslating(false);
+                        }
+                      }}
+                      style={{ fontSize: "12px" }}
+                    >
+                      多言語へ反映
+                    </button>
+                  </div>
+                </div>
+
+                {/* English */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>English</label>
+                  <input
+                    type="text"
+                    value={newFood.name_en || ""}
+                    readOnly
+                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc", background: "#f5f5f5" }}
+                  />
+                </div>
+
+                {/* 中文 */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>中文</label>
+                  <input
+                    type="text"
+                    value={newFood.name_zh || ""}
+                    readOnly
+                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc", background: "#f5f5f5" }}
+                  />
+                </div>
+
+                {/* 韓国語 */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>한국어</label>
+                  <input
+                    type="text"
+                    value={newFood.name_ko || ""}
+                    readOnly
+                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc", background: "#f5f5f5" }}
+                  />
+                </div>
+              </div>
+
+              {/* 共通項目 */}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "180px 1fr 100px",
+                gap: "10px",
+                marginTop: "18px",
+                maxWidth: "580px",
+                margin: "0 auto",
+              }}>
+                <div>
+                  <label style={{ fontSize: "14px" }}>カテゴリー</label>
+                  <select
+                    value={newFood.foodcategory || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__add__") { setShowAddCategory(true); }
+                      else { setNewFood({ ...newFood, foodcategory: val }); }
+                    }}
+                    style={{ width: "100%", height: "40px", marginTop: "6px", fontSize: "14px" }}
+                  >
+                    <option value="">選択してください</option>
+                    <option value="__add__">＋ カテゴリー追加</option>
+                    {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
+                  </select>
+                  {showAddCategory && (
+                    <div style={{ marginTop: "10px", padding: "10px", background: "#f9f9f9", border: "1px solid #ddd" }}>
+                      <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} style={{ width: "100%", marginBottom: "6px" }} />
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                        <button onClick={() => setShowAddCategory(false)}>キャンセル</button>
+                        <button onClick={async () => {
+                          const newCat = await handleAddCategory(newCategoryName);
+                          if (newCat) setNewFood({ ...newFood, foodcategory: newCat });
+                          setShowAddCategory(false);
+                        }}>追加</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "14px" }}>Description</label>
+                  <input type="text" value={newFood.description} onChange={(e) => setNewFood({ ...newFood, description: e.target.value })} style={{ width: "100%", height: "40px", marginTop: "6px" }} />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "14px" }}>Price</label>
+                  <input type="number" value={newFood.price} onChange={(e) => setNewFood({ ...newFood, price: e.target.value })} style={{ width: "100%", height: "40px", marginTop: "6px" }} />
+                </div>
+              </div>
+
+              {/* 画像セクション (Foodに必須) */}
+              <div style={{ marginTop: "18px", maxWidth: "580px", margin: "18px auto 0" }}>
+                <label style={{ display: "block", fontSize: "14px", fontWeight: "bold", marginBottom: "4px" }}>画像</label>
+                <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+                  {previewImage ? (
+                    <img src={previewImage} style={{ width: "80px", height: "80px", objectFit: "cover", borderRadius: "8px", border: "1px solid #ccc" }} />
+                  ) : (
+                    <div style={{ width: "80px", height: "80px", background: "#eee", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#999" }}>未選択</div>
+                  )}
+                  <input type="file" accept="image/*" onChange={onFileChange} style={{ fontSize: "12px" }} />
+                </div>
+              </div>
+
+              <div style={{ marginTop: "18px", maxWidth: "580px", margin: "18px auto 0" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
+                  <input
+                    type="checkbox"
+                    checked={newFood.isactive}
+                    onChange={(e) => setNewFood({ ...newFood, isactive: e.target.checked })}
+                  />
+                  表示する
+                </label>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "28px", maxWidth: "580px", margin: "28px auto 0" }}>
+                <button onClick={() => setShowAdd(false)}>キャンセル</button>
+                <button onClick={addFood}>追加</button>
+              </div>
             </div>
-
-            <label>
-              <input
-                type="checkbox"
-                checked={newFood.isactive}
-                onChange={(e)=>setNewFood({...newFood, isactive:e.target.checked})}
-              />
-              表示する
-            </label>
-
-            <div style={{
-              marginTop:"15px",
-              display:"flex",
-              justifyContent:"space-between"
-            }}>
-              <button disabled={uploading} onClick={()=>setShowAdd(false)}>キャンセル</button>
-              <button
-                disabled={uploading}
-                onClick={() => {
-                  console.log("🔥 BUTTON CLICK")
-                  addFood()
-                }}
-              >
-                {uploading ? "登録中..." : "登録"}
-              </button>
-            </div>
-
           </div>
         </div>
       )}

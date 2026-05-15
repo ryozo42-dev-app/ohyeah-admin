@@ -5,12 +5,26 @@ import { supabase } from "@/lib/supabase"
 
 type Drink = {
   id: number
-  name: string
-  name_en: string
-  drinkcategory: string
-  description: string | null
-  price: number
+
+  name_ja: string
+  name_en?: string
+  name_zh?: string
+  name_ko?: string
+
+  description?: string
+
+  category?: string
+  drinkcategory?: string
+
+  price?: number
+
+  imageurl?: string
+
   isactive: boolean
+
+  displayorder?: number
+
+  createdat?: Date | null
 }
 
 export default function Drinks() {
@@ -30,10 +44,15 @@ export default function Drinks() {
   const [newPrice, setNewPrice] = useState("")
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [newCategory, setNewCategory] = useState("")
+  const [isTranslating, setIsTranslating] = useState(false)
+  const [showAddAddCategory, setShowAddAddCategory] = useState(false) // For add modal's category add
+  const [isSaving, setIsSaving] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [newDrink, setNewDrink] = useState({
-    name: "",
+    name_ja: "",
     name_en: "",
+    name_zh: "",
+    name_ko: "",
     drinkcategory: "BEER",
     description: "",
     price: "",
@@ -43,7 +62,7 @@ export default function Drinks() {
   const perPage = 10
 
   const load = async () => {
-    let query = supabase.from("menu_drinks").select("*");
+    let query = supabase.from("world_drinks").select("*");
 
     // カテゴリーフィルターを適用
     if (selectedFilterCategory) {
@@ -69,6 +88,32 @@ export default function Drinks() {
     }
 
     if (data) {
+      const list: Drink[] = (data || []).map((d: any) => ({
+        id: d.id,
+
+        name_ja: d.name_ja || "",
+        name_en: d.name_en || "",
+        name_zh: d.name_zh || "",
+        name_ko: d.name_ko || "",
+
+        description: d.description || "",
+
+        category: d.category || "",
+        drinkcategory: d.drinkcategory || "",
+
+        price: d.price || 0,
+
+        imageurl: d.imageurl || "",
+
+        isactive: d.isactive ?? true,
+
+        displayorder: d.displayorder || 0,
+
+        createdat: d.createdat
+          ? new Date(d.createdat)
+          : null,
+      }))
+
       const priorityOrder = [
         "BEER",
         "BEER_COCKTAIL",
@@ -80,7 +125,7 @@ export default function Drinks() {
         "SOFT_DRINK",
       ]
 
-      const sortedData = [...data].sort((a, b) => {
+      const sortedData = [...list].sort((a, b) => {
         // ① カテゴリー（drinkcategory）のソート
         const idxA = priorityOrder.indexOf(a.drinkcategory)
         const idxB = priorityOrder.indexOf(b.drinkcategory)
@@ -98,8 +143,8 @@ export default function Drinks() {
 
         if (catComp !== 0) return catComp
 
-        // ② 名前（name）のソート
-        const nameComp = a.name.localeCompare(b.name);
+        // ② 名前（name_ja）のソート
+        const nameComp = a.name_ja.localeCompare(b.name_ja);
         if (nameComp !== 0) return nameComp;
 
         // ③ 価格（price）のソート
@@ -173,11 +218,14 @@ export default function Drinks() {
   const saveEdit = async () => {
     if (!editDrink) return
 
+    setIsSaving(true)
     const { error } = await supabase
-      .from("menu_drinks")
+      .from("world_drinks")
       .update({
-        name: editDrink.name,
+        name_ja: editDrink.name_ja,
         name_en: editDrink.name_en,
+        name_zh: editDrink.name_zh,
+        name_ko: editDrink.name_ko,
         drinkcategory: editDrink.drinkcategory,
         description: editDrink.description,
         price: Number(editDrink.price),
@@ -188,10 +236,12 @@ export default function Drinks() {
     if (error) {
       console.error("UPDATE ERROR:", error)
       alert(error.message)
+      setIsSaving(false)
       return
     }
 
     load()
+    setIsSaving(false)
     setShowEdit(false)
   }
 
@@ -199,7 +249,7 @@ export default function Drinks() {
     console.log("🔥 DELETE:", id)
 
     const { error } = await supabase
-      .from("menu_drinks")
+      .from("world_drinks")
       .delete()
       .eq("id", id)
 
@@ -213,17 +263,20 @@ export default function Drinks() {
   }
 
   const addDrink = async () => {
-    if (!newDrink.name) {
+    if (!newDrink.name_ja) {
       alert("名前を入力してください")
       return
     }
 
+    setIsSaving(true)
     const { data, error } = await supabase
-      .from("menu_drinks")
+      .from("world_drinks")
       .insert([
         {
-          name: newDrink.name,
+          name_ja: newDrink.name_ja,
           name_en: newDrink.name_en,
+          name_zh: newDrink.name_zh,
+          name_ko: newDrink.name_ko,
           drinkcategory: newDrink.drinkcategory,
           description: newDrink.description,
           price: Number(newDrink.price || 0),
@@ -234,15 +287,19 @@ export default function Drinks() {
 
     if (error) {
       console.error("INSERT ERROR:", error)
+      setIsSaving(false)
       return
     }
 
     load()
+    setIsSaving(false)
 
     // 初期化
     setNewDrink({
-      name: "",
+      name_ja: "",
       name_en: "",
+      name_zh: "",
+      name_ko: "",
       drinkcategory: "BEER",
       description: "",
       price: "",
@@ -252,29 +309,63 @@ export default function Drinks() {
     setShowAdd(false)
   }
 
-  const addCategory = async () => {
-    if (!newCategoryName.trim()) return
+  const handleTranslate = async () => {
+    if (!editDrink) return
+    setIsTranslating(true)
 
+    try {
+      const res = await fetch(
+        "https://ikezocnvlrhluxhxwfug.supabase.co/functions/v1/translate-news",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: editDrink.name_ja,
+            body: editDrink.description || "",
+          }),
+        }
+      )
+
+      const data = await res.json()
+
+      setEditDrink({
+        ...editDrink,
+        name_en: data.title_en,
+        name_zh: data.title_zh,
+        name_ko: data.title_ko,
+      })
+    } catch (err) {
+      console.error(err)
+      alert("翻訳失敗")
+    } finally {
+      setIsTranslating(false)
+    }
+  }
+
+  const handleAddCategory = async (categoryName: string) => {
+    if (!categoryName.trim()) {
+      alert("カテゴリー名を入力してください")
+      return null
+    }
+    const name = categoryName.trim().toUpperCase()
     const { error } = await supabase
       .from("drink_categories")
-      .insert([{ name: newCategoryName.trim() }])
-
+      .insert([{ name }])
     if (error) {
-      alert("カテゴリーの追加に失敗しました")
-      return
+      alert("カテゴリーの追加に失敗しました: " + error.message)
+      return null
     }
-
-    // 一覧を更新（アルファベット順にソート）
-    const updated = [...categories, newCategoryName.trim()].sort()
+    const updated = [...categories, name].sort()
     setCategories(updated)
-
-    // 現在編集/追加中の項目のカテゴリーを、今作ったものに自動セットする
-    if (editDrink) setEditDrink({ ...editDrink, drinkcategory: newCategoryName.trim() })
-    if (showAdd) setNewDrink({ ...newDrink, drinkcategory: newCategoryName.trim() })
-
     setNewCategoryName("")
-    setShowAddCategory(false)
+    return name
   }
+
+  // addCategoryはもう使わないので削除
+  // const addCategory = async () => { ... }
+
 
   const bulkDelete = async () => {
     if (selected.length === 0) {
@@ -287,7 +378,7 @@ export default function Drinks() {
     console.log("🔥 BULK DELETE:", selected)
 
     const { error } = await supabase
-      .from("menu_drinks")
+      .from("world_drinks")
       .delete()
       .in("id", selected)
 
@@ -314,7 +405,7 @@ export default function Drinks() {
     }
 
     const { error } = await supabase
-      .from("menu_drinks")
+      .from("world_drinks")
       .update({ price })
       .in("id", selected)
 
@@ -343,7 +434,7 @@ export default function Drinks() {
     }
 
     const { error } = await supabase
-      .from("menu_drinks")
+      .from("world_drinks")
       .update({ drinkcategory: newCategory })
       .in("id", selected)
 
@@ -367,15 +458,21 @@ export default function Drinks() {
     }
 
     // ヘッダー
-    const header = ["名前", "英語名", "カテゴリー", "説明", "価格"]
+    const header = ["id", "name_ja", "name_en", "name_zh", "name_ko", "drinkcategory", "description", "price", "imageurl", "isactive", "displayorder"]
 
     // データ
-    const rows = drinks.map(d => [
-      d.name,
-      d.name_en,
-      d.drinkcategory,
-      d.description || "",
-      d.price
+    const rows = drinks.map(item => [
+      item.id,
+      item.name_ja,
+      item.name_en || "",
+      item.name_zh || "",
+      item.name_ko || "",
+      item.drinkcategory,
+      item.description || "",
+      item.price,
+      item.imageurl || "",
+      item.isactive,
+      item.displayorder || 0
     ])
 
     // CSV文字列作成
@@ -470,30 +567,30 @@ export default function Drinks() {
         </thead>
 
         <tbody>
-          {view.map(food => (
+          {view.map(item => (
             <tr
-              key={food.id}
-              style={{ opacity: food.isactive ? 1 : 0.4 }}
+              key={item.id}
+              style={{ opacity: item.isactive ? 1 : 0.4 }}
             >
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
                 <input
                   type="checkbox"
-                  checked={selected.includes(food.id)}
-                  onChange={() => toggle(food.id)}
+                  checked={selected.includes(item.id)}
+                  onChange={() => toggle(item.id)}
                   style={{ transform: "scale(0.8)" }}
                 />
               </td>
 
               <td style={{ border: "1px solid #ddd", padding: "2px 4px", whiteSpace: "nowrap" }}>
-                {food.name}
+                {item.name_ja}
               </td>
 
               <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
-                {food.name_en}
+                {item.name_en}
               </td>
 
               <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
-                {food.drinkcategory}
+                {item.drinkcategory}
               </td>
 
               {/* 👇 説明は広く＋省略なし */}
@@ -505,25 +602,25 @@ export default function Drinks() {
                   textAlign: "left"
                 }}
               >
-                {food.description || "-"}
+                {item.description || "-"}
               </td>
 
               <td style={{ border: "1px solid #ddd", padding: "2px 4px", textAlign: "right" }}>
-                ¥{food.price}
+                ¥{item.price}
               </td>
 
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
                 <input
                   type="checkbox"
-                  checked={food.isactive}
+                  checked={item.isactive}
                   onChange={async (e) => {
                     const checked = e.target.checked
 
                     // DB更新
                     const { error } = await supabase
-                      .from("menu_drinks")
+                      .from("world_drinks")
                       .update({ isactive: checked })
-                      .eq("id", food.id)
+                      .eq("id", item.id)
 
                     if (error) {
                       alert("更新失敗")
@@ -532,7 +629,7 @@ export default function Drinks() {
 
                     // UI更新（即反映）
                     setDrinks(drinks.map(x =>
-                      x.id === food.id ? { ...x, isactive: checked } : x
+                      x.id === item.id ? { ...x, isactive: checked } : x
                     ))
                   }}
                 />
@@ -552,7 +649,7 @@ export default function Drinks() {
                 <button
                   style={{ fontSize: "11px", padding: "1px 6px" }}
                   onClick={() => {
-                    setEditDrink(food)
+                    setEditDrink(item)
                     setShowEdit(true)
                   }}
                 >
@@ -570,7 +667,7 @@ export default function Drinks() {
                   disabled={!isAdmin}
                   onClick={() => {
                     if (!confirm("このドリンクを削除しますか？")) return
-                    handleDelete(food.id)
+                    handleDelete(item.id)
                   }}
                 >
                   削除
@@ -701,17 +798,17 @@ export default function Drinks() {
           </tr>
         </thead>
         <tbody>
-          {drinks.map(d => (
-            <tr key={d.id} style={{ opacity: d.isactive ? 1 : 0.4 }}>
+          {drinks.map(item => (
+            <tr key={item.id} style={{ opacity: item.isactive ? 1 : 0.4 }}>
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}></td>
               <td style={{ border: "1px solid #ddd", padding: "2px 4px", whiteSpace: "nowrap" }}>
-                {d.name}
+                {item.name_ja}
               </td>
               <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
-                {d.name_en}
+                {item.name_en}
               </td>
               <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
-                {d.drinkcategory}
+                {item.drinkcategory}
               </td>
               <td
                 style={{
@@ -721,13 +818,13 @@ export default function Drinks() {
                   textAlign: "left"
                 }}
               >
-                {d.description || "-"}
+                {item.description || "-"}
               </td>
               <td style={{ border: "1px solid #ddd", padding: "2px 4px", textAlign: "right" }}>
-                ¥{d.price}
+                ¥{item.price}
               </td>
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
-                {d.isactive ? "○" : "×"}
+                {item.isactive ? "○" : "×"}
               </td>
               <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}></td>
             </tr>
@@ -736,319 +833,497 @@ export default function Drinks() {
       </table>
 
       {showEdit && editDrink && (
-        <div style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          background: "rgba(0,0,0,0.4)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}>
-          <div style={{
-            background: "#fff",
-            padding: "20px",
-            borderRadius: "8px",
-            width: "400px"
-          }}>
-
-            <h3>ドリンク編集</h3>
-
-            <input
-              value={editDrink.name}
-              onChange={(e)=>setEditDrink({...editDrink, name:e.target.value})}
-              placeholder="名前"
-              style={{ width:"100%", marginBottom:"6px" }}
-            />
-
-            <input
-              value={editDrink.name_en}
-              onChange={(e)=>setEditDrink({...editDrink, name_en:e.target.value})}
-              placeholder="英語名"
-              style={{ width:"100%", marginBottom:"6px" }}
-            />
-
-            <select
-              value={editDrink.drinkcategory}
-              onChange={(e) => {
-                if (e.target.value === "__add__") {
-                  setShowAddCategory(true)
-                  return
-                }
-
-                setEditDrink({
-                  ...editDrink,
-                  drinkcategory: e.target.value
-                })
-              }}
-              style={{ width: "100%", marginBottom: "6px" }}
-            >
-              <option value="__add__">＋ カテゴリー追加</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-
-            {showAddCategory && (
+        <div className="modalOverlay">
+          <div
+            className="modalContent"
+            style={{
+              width: "92vw",
+              maxWidth: "680px",
+              borderRadius: "14px",
+              overflow: "hidden",
+              padding: 0,
+              position: "relative",
+            }}
+          >
+            {/* 翻訳中・保存中のオーバーレイ表示 */}
+            {(isTranslating || isSaving) && (
               <div style={{
-                marginTop: "10px",
-                padding: "10px",
-                background: "#f9f9f9",
-                borderRadius: "4px",
-                border: "1px solid #ddd"
+                position: "absolute",
+                inset: 0,
+                backgroundColor: "rgba(255, 255, 255, 0.7)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 100,
+                animation: "fadeIn 0.3s ease"
               }}>
-                <input
-                  placeholder="新しいカテゴリー名"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  style={{ width: "100%", marginBottom: "6px" }}
-                />
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                  <button
-                    style={{ fontSize: "11px" }}
-                    onClick={() => setShowAddCategory(false)}
-                  >キャンセル</button>
-                  <button style={{ fontSize: "11px" }} onClick={addCategory}>追加</button>
-                </div>
+                <div className="loader" />
+                <p style={{
+                  marginTop: "16px",
+                  color: "#8B5E3C",
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                  letterSpacing: "0.1em"
+                }}>
+                  {isTranslating ? "翻訳中..." : "保存中..."}
+                </p>
+                <style>{`
+                  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                  .loader {
+                    width: 40px;
+                    height: 40px;
+                    border: 3px solid #f3f3f3;
+                    border-top: 3px solid #8B5E3C;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                  }
+                  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                `}</style>
               </div>
             )}
 
-            <input
-              value={editDrink.description || ""}
-              onChange={(e)=>setEditDrink({...editDrink, description:e.target.value})}
-              placeholder="説明"
-              style={{ width:"100%", marginBottom:"6px" }}
+            {/* 上ブラウンバー */}
+            <div
+              style={{
+                height: "14px",
+                background: "#8B5E3C",
+              }}
             />
 
-            <input
-              type="number"
-              value={editDrink.price === 0 ? "" : editDrink.price}
-              onChange={(e)=>setEditDrink({
-                ...editDrink,
-                price: e.target.value === "" ? 0 : Number(e.target.value)
-              })}
-              placeholder="価格"
-              style={{ width:"100%", marginBottom:"10px" }}
-            />
+            <div style={{ padding: "22px" }}>
+              {/* タイトル */}
+              <h2
+                style={{
+                  textAlign: "center",
+                  fontSize: "34px",
+                  marginBottom: "22px",
+                  fontWeight: "bold",
+                }}
+              >
+                Drink編集
+              </h2>
 
-            <label>
-              <input
-                type="checkbox"
-                checked={editDrink.isactive}
-                onChange={(e)=>setEditDrink({
-                  ...editDrink,
-                  isactive: e.target.checked
-                })}
-              />
-              表示する
-            </label>
+              {/* 多言語エリア */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gap: "10px",
+                }}
+              >
+                {/* 日本語 */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>日本語</label>
+                  <input
+                    type="text"
+                    value={editDrink.name_ja}
+                    onChange={(e) => setEditDrink({ ...editDrink, name_ja: e.target.value })}
+                    style={{
+                      width: "100%",
+                      height: "42px",
+                      marginTop: "6px",
+                      fontSize: "15px",
+                      padding: "0 10px",
+                      borderRadius: "8px",
+                      border: "1px solid #ccc",
+                      boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+                    }}
+                  />
+                  {/* 多言語へ反映ボタン */}
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
+                    <button 
+                      onClick={handleTranslate} 
+                      style={{ fontSize: "13px" }}
+                    >
+                      多言語へ反映
+                    </button>
+                  </div>
+                </div>
 
-            <div style={{
-              marginTop:"15px",
-              display:"flex",
-              justifyContent:"space-between"
-            }}>
-              <button onClick={()=>setShowEdit(false)}>キャンセル</button>
-              <button onClick={saveEdit}>保存</button>
+                {/* English */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>English</label>
+                  <input
+                    type="text"
+                    value={editDrink.name_en || ""}
+                    readOnly
+                    style={{
+                      width: "100%",
+                      height: "42px",
+                      marginTop: "6px",
+                      fontSize: "15px",
+                      padding: "0 10px",
+                      borderRadius: "8px",
+                      border: "1px solid #ccc",
+                      background: "#f5f5f5",
+                    }}
+                  />
+                </div>
+
+                {/* 中文 */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>中文</label>
+                  <input
+                    type="text"
+                    value={editDrink.name_zh || ""}
+                    readOnly
+                    style={{
+                      width: "100%",
+                      height: "42px",
+                      marginTop: "6px",
+                      fontSize: "15px",
+                      padding: "0 10px",
+                      borderRadius: "8px",
+                      border: "1px solid #ccc",
+                      background: "#f5f5f5",
+                    }}
+                  />
+                </div>
+
+                {/* 한국어 */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>한국어</label>
+                  <input
+                    type="text"
+                    value={editDrink.name_ko || ""}
+                    readOnly
+                    style={{
+                      width: "100%",
+                      height: "42px",
+                      marginTop: "6px",
+                      fontSize: "14px",
+                      padding: "0 10px",
+                      borderRadius: "8px",
+                      border: "1px solid #ccc",
+                      background: "#f5f5f5",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* 共通項目 */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 140px",
+                  gap: "10px",
+                  marginTop: "18px",
+                }}
+              >
+                {/* Category */}
+                <div>
+                  <label style={{ fontSize: "14px" }}>Category</label>
+                  <select
+                    value={editDrink.drinkcategory}
+                    onChange={(e) => {
+                      if (e.target.value === "__add__") {
+                        setShowAddCategory(true)
+                        return
+                      }
+                      setEditDrink({ ...editDrink, drinkcategory: e.target.value })
+                    }}
+                    style={{ width: "100%", height: "40px", marginTop: "6px", padding: "0 10px", fontSize: "14px" }}
+                  >
+                    <option value="">選択してください</option>
+                    <option value="__add__">＋ カテゴリー追加</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+
+                  {showAddCategory && (
+                    <div style={{ marginTop: "10px", padding: "10px", background: "#f9f9f9", borderRadius: "4px", border: "1px solid #ddd" }}>
+                      <input
+                        placeholder="新しいカテゴリー名"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        style={{ width: "100%", marginBottom: "6px" }}
+                      />
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                        <button style={{ fontSize: "11px" }} onClick={() => { setShowAddCategory(false); setNewCategoryName(""); }}>キャンセル</button>
+                        <button style={{ fontSize: "11px" }} onClick={async () => {
+                          const newCat = await handleAddCategory(newCategoryName);
+                          if (newCat && editDrink) {
+                            setEditDrink({ ...editDrink, category: newCat, drinkcategory: newCat });
+                          }
+                          setShowAddCategory(false);
+                        }}>追加</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label style={{ fontSize: "14px" }}>Description</label>
+                  <input
+                    type="text"
+                    value={editDrink.description || ""}
+                    onChange={(e) => setEditDrink({ ...editDrink, description: e.target.value })}
+                    style={{ width: "100%", height: "40px", marginTop: "6px", padding: "0 10px", fontSize: "14px" }}
+                  />
+                </div>
+
+                {/* Price */}
+                <div>
+                  <label style={{ fontSize: "14px" }}>Price</label>
+                  <input
+                    type="number"
+                    value={editDrink.price === 0 ? "" : editDrink.price}
+                    onChange={(e) => setEditDrink({ ...editDrink, price: e.target.value === "" ? 0 : Number(e.target.value) })}
+                    style={{ width: "100%", height: "40px", marginTop: "6px", padding: "0 10px", fontSize: "14px" }}
+                  />
+                </div>
+              </div>
+
+              {/* 表示 */}
+              <div style={{ marginTop: "18px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={editDrink.isactive}
+                    onChange={(e) => setEditDrink({ ...editDrink, isactive: e.target.checked })}
+                  />
+                  表示する
+                </label>
+              </div>
+
+              {/* ボタン */}
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "28px" }}>
+                <button onClick={() => setShowEdit(false)}>キャンセル</button>
+                <button onClick={saveEdit}>保存</button>
+              </div>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* 新規追加モーダル */}
+      {/* 新規追加モーダル (最新の2列レイアウト版) */}
       {showAdd && (
-        <div style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          background: "rgba(0,0,0,0.4)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}>
-          <div style={{
-            background: "#fff",
-            padding: "20px",
-            borderRadius: "8px",
-            width: "400px"
+        <div className="modalOverlay">
+          <div className="modalContent" style={{
+            width: "92vw",
+            maxWidth: "680px",
+            borderRadius: "14px",
+            overflow: "hidden",
+            padding: 0,
+            position: "relative",
           }}>
-
-            <h3>ドリンク追加</h3>
-
-            <input
-              placeholder="名前"
-              value={newDrink.name}
-              onChange={(e)=>setNewDrink({...newDrink, name:e.target.value})}
-              style={{ width:"100%", marginBottom:"6px" }}
-            />
-
-            <input
-              placeholder="英語名"
-              value={newDrink.name_en}
-              onChange={(e)=>setNewDrink({...newDrink, name_en:e.target.value})}
-              style={{ width:"100%", marginBottom:"6px" }}
-            />
-
-            <select
-              value={newDrink.drinkcategory}
-              onChange={(e) => {
-                if (e.target.value === "__add__") {
-                  setShowAddCategory(true)
-                  return
-                }
-                setNewDrink({ ...newDrink, drinkcategory: e.target.value })
-              }}
-              style={{ width: "100%", marginBottom: "6px" }}
-            >
-              <option value="__add__">＋ カテゴリー追加</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-
-            {showAddCategory && (
+            {/* 翻訳中・保存中のオーバーレイ */}
+            {(isTranslating || isSaving) && (
               <div style={{
-                marginTop: "10px",
-                padding: "10px",
-                background: "#f9f9f9",
-                borderRadius: "4px",
-                border: "1px solid #ddd"
+                position: "absolute",
+                inset: 0,
+                backgroundColor: "rgba(255, 255, 255, 0.7)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 100,
               }}>
-                <input
-                  placeholder="新しいカテゴリー名"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  style={{ width: "100%", marginBottom: "6px" }}
-                />
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                  <button style={{ fontSize: "11px" }} onClick={() => setShowAddCategory(false)}>キャンセル</button>
-                  <button style={{ fontSize: "11px" }} onClick={addCategory}>追加</button>
-                </div>
+                <div className="loader" />
+                <p style={{ marginTop: "16px", color: "#8B5E3C", fontWeight: "bold" }}>
+                  {isTranslating ? "翻訳中..." : "保存中..."}
+                </p>
+                <style>{`
+                  .loader {
+                    width: 40px;
+                    height: 40px;
+                    border: 3px solid #f3f3f3;
+                    border-top: 3px solid #8B5E3C;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                  }
+                  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                `}</style>
               </div>
             )}
 
-            <input
-              placeholder="説明"
-              value={newDrink.description}
-              onChange={(e)=>setNewDrink({...newDrink, description:e.target.value})}
-              style={{ width:"100%", marginBottom:"6px" }}
-            />
+            <div style={{ height: "14px", background: "#8B5E3C" }} />
 
-            <input
-              type="number"
-              placeholder="価格"
-              value={newDrink.price}
-              onChange={(e)=>setNewDrink({...newDrink, price:e.target.value})}
-              style={{ width:"100%", marginBottom:"10px" }}
-            />
+            <div style={{ padding: "22px" }}>
+              <h2 style={{ textAlign: "center", fontSize: "34px", marginBottom: "22px", fontWeight: "bold" }}>
+                Drink追加
+              </h2>
 
-            <label>
-              <input
-                type="checkbox"
-                checked={newDrink.isactive}
-                onChange={(e)=>setNewDrink({...newDrink, isactive:e.target.checked})}
-              />
-              表示する
-            </label>
+              {/* 多言語エリア */}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 250px)",
+                gap: "30px",
+                justifyContent: "center",
+                maxWidth: "580px",
+                margin: "0 auto",
+              }}>
+                {/* 日本語 */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>日本語</label>
+                  <input
+                    type="text"
+                    value={newDrink.name_ja}
+                    onChange={(e) => setNewDrink({ ...newDrink, name_ja: e.target.value })}
+                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc" }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
+                    <button
+                      onClick={async () => {
+                        setIsTranslating(true);
+                        try {
+                          const res = await fetch("https://ikezocnvlrhluxhxwfug.supabase.co/functions/v1/translate-news", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ title: newDrink.name_ja, body: newDrink.description || "" }),
+                          });
+                          const data = await res.json();
+                          setNewDrink({ ...newDrink, name_en: data.title_en, name_zh: data.title_zh, name_ko: data.title_ko });
+                        } catch (err) {
+                          alert("翻訳失敗");
+                        } finally {
+                          setIsTranslating(false);
+                        }
+                      }}
+                      style={{ fontSize: "12px" }}
+                    >
+                      多言語へ反映
+                    </button>
+                  </div>
+                </div>
 
-            <div style={{
-              marginTop:"15px",
-              display:"flex",
-              justifyContent:"space-between"
-            }}>
-              <button onClick={()=>setShowAdd(false)}>キャンセル</button>
-              <button onClick={addDrink}>登録</button>
+                {/* English */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>English</label>
+                  <input
+                    type="text"
+                    value={newDrink.name_en || ""}
+                    readOnly
+                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc", background: "#f5f5f5" }}
+                  />
+                </div>
+
+                {/* 中文 */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>中文</label>
+                  <input
+                    type="text"
+                    value={newDrink.name_zh || ""}
+                    readOnly
+                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc", background: "#f5f5f5" }}
+                  />
+                </div>
+
+                {/* 韓国語 */}
+                <div>
+                  <label style={{ fontSize: "16px", fontWeight: "bold" }}>한국어</label>
+                  <input
+                    type="text"
+                    value={newDrink.name_ko || ""}
+                    readOnly
+                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc", background: "#f5f5f5" }}
+                  />
+                </div>
+              </div>
+
+              {/* 共通項目 */}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "120px 1fr 100px",
+                gap: "10px",
+                marginTop: "18px",
+                maxWidth: "580px",
+                margin: "0 auto",
+              }}>
+                <div>
+                  <label style={{ fontSize: "14px" }}>カテゴリー</label>
+                  <select
+                    value={newDrink.drinkcategory || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__add__") { setShowAddAddCategory(true); }
+                      else { setNewDrink({ ...newDrink, drinkcategory: val }); }
+                    }}
+                    style={{ width: "100%", height: "40px", marginTop: "6px", fontSize: "14px" }}
+                  >
+                    <option value="">選択してください</option>
+                    <option value="__add__">＋ カテゴリー追加</option>
+                    {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
+                  </select>
+                  {showAddAddCategory && (
+                    <div style={{ marginTop: "10px", padding: "10px", background: "#f9f9f9", border: "1px solid #ddd" }}>
+                      <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} style={{ width: "100%", marginBottom: "6px" }} />
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                        <button onClick={() => setShowAddAddCategory(false)}>キャンセル</button>
+                        <button onClick={async () => {
+                          const newCat = await handleAddCategory(newCategoryName);
+                          if (newCat) setNewDrink({ ...newDrink, drinkcategory: newCat });
+                          setShowAddAddCategory(false);
+                        }}>追加</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "14px" }}>Description</label>
+                  <input type="text" value={newDrink.description} onChange={(e) => setNewDrink({ ...newDrink, description: e.target.value })} style={{ width: "100%", height: "40px", marginTop: "6px" }} />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "14px" }}>Price</label>
+                  <input type="number" value={newDrink.price} onChange={(e) => setNewDrink({ ...newDrink, price: e.target.value })} style={{ width: "100%", height: "40px", marginTop: "6px" }} />
+                </div>
+              </div>
+
+              <div style={{ marginTop: "18px", maxWidth: "580px", margin: "18px auto 0" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
+                  <input
+                    type="checkbox"
+                    checked={newDrink.isactive}
+                    onChange={(e) => setNewDrink({ ...newDrink, isactive: e.target.checked })}
+                  />
+                  表示する
+                </label>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "28px", maxWidth: "580px", margin: "28px auto 0" }}>
+                <button onClick={() => setShowAdd(false)}>キャンセル</button>
+                <button onClick={addDrink}>追加</button>
+              </div>
             </div>
-
           </div>
         </div>
       )}
 
       {/* 一括価格変更モーダル */}
       {showPriceModal && (
-        <div style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          background: "rgba(0,0,0,0.4)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}>
-          <div style={{
-            background: "#fff",
-            padding: "20px",
-            borderRadius: "8px",
-            width: "300px"
-          }}>
-
-            <h3>一括価格変更</h3>
-
+        <div className="modalOverlay">
+          <div className="modalContent" style={{ background: "#fff", padding: "20px", borderRadius: "8px", width: "300px" }}>
+            <h3 style={{ textAlign: "center", marginBottom: "15px" }}>一括価格変更</h3>
             <div style={{ display: "flex", alignItems: "center", marginTop: "10px" }}>
               <span style={{ marginRight: "4px" }}>¥</span>
-
               <input
                 type="number"
                 placeholder="価格"
                 value={newPrice}
                 onChange={(e) => setNewPrice(e.target.value)}
-                style={{ width: "100%" }}
+                style={{ width: "100%", height: "35px", padding: "0 8px" }}
               />
             </div>
-
-            <div style={{
-              marginTop:"20px",
-              display:"flex",
-              justifyContent:"space-between"
-            }}>
-              <button onClick={()=>{
-                setShowPriceModal(false)
-                setNewPrice("")
-              }}>
-                キャンセル
-              </button>
-
-              <button onClick={bulkUpdatePrice}>
-                変更
-              </button>
+            <div style={{ marginTop: "20px", display: "flex", justifyContent: "space-between" }}>
+              <button onClick={() => { setShowPriceModal(false); setNewPrice(""); }}>キャンセル</button>
+              <button onClick={bulkUpdatePrice}>変更</button>
             </div>
-
           </div>
         </div>
       )}
 
+      {/* 一括カテゴリー変更モーダル */}
       {showCategoryModal && (
-        <div style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          background: "rgba(0,0,0,0.4)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}>
-          <div style={{
-            background: "#fff",
-            padding: "20px",
-            borderRadius: "8px",
-            width: "300px"
-          }}>
-
-            <h3>一括カテゴリー変更</h3>
-
+        <div className="modalOverlay">
+          <div className="modalContent" style={{ background: "#fff", padding: "20px", borderRadius: "8px", width: "300px" }}>
+            <h3 style={{ textAlign: "center", marginBottom: "15px" }}>一括カテゴリー変更</h3>
             <select
               value={newCategory}
               onChange={(e) => {
@@ -1058,52 +1333,35 @@ export default function Drinks() {
                 }
                 setNewCategory(e.target.value)
               }}
-              style={{ width:"100%", marginTop:"10px" }}
+              style={{ width: "100%", height: "35px", marginTop: "10px" }}
             >
               <option value="">選択してください</option>
               <option value="__add__">＋ カテゴリー追加</option>
-
-              {categories.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {categories.map(c => (<option key={c} value={c}>{c}</option>))}
             </select>
-
             {showAddCategory && (
-              <div style={{ marginTop: "10px" }}>
+              <div style={{ marginTop: "10px", padding: "10px", background: "#f9f9f9" }}>
                 <input
                   placeholder="新カテゴリー"
                   value={newCategoryName}
-                  onChange={(e)=>setNewCategoryName(e.target.value)}
-                  style={{ width: "70%" }}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  style={{ width: "100%", marginBottom: "6px" }}
                 />
-                <button
-                  onClick={addCategory}
-                >
-                  追加
-                </button>
+                <button onClick={async () => {
+                  const newCat = await handleAddCategory(newCategoryName);
+                  if (newCat) setNewCategory(newCat);
+                  setShowAddCategory(false);
+                }}>追加</button>
               </div>
             )}
-
-            <div style={{
-              marginTop:"20px",
-              display:"flex",
-              justifyContent:"space-between"
-            }}>
-              <button onClick={()=>{
-                setShowCategoryModal(false)
-                setNewCategory("")
-              }}>
-                キャンセル
-              </button>
-
-              <button onClick={bulkUpdateCategory}>
-                変更
-              </button>
+            <div style={{ marginTop: "20px", display: "flex", justifyContent: "space-between" }}>
+              <button onClick={() => { setShowCategoryModal(false); setNewCategory(""); }}>キャンセル</button>
+              <button onClick={bulkUpdateCategory}>変更</button>
             </div>
-
           </div>
         </div>
       )}
+
     </div>
-  )
+  );
 }
