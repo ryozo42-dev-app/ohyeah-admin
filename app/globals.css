@@ -188,6 +188,7 @@ td img {
 }
 
 .modalField input[type="text"],
+.modalField input[type="number"],
 .modalField textarea {
   width: 100%;
   padding: 10px;
@@ -307,4 +308,15 @@ td:nth-child(7) {
 /* 通常時は印刷用要素を隠す */
 .print-only {
   display: none;
+}
+
+/* number input の上下ボタン（スピナー）を非表示にする */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
 }

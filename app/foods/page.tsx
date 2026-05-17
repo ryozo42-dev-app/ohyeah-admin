@@ -310,7 +310,8 @@ export default function Foods() {
           description: editFood.description,
           imageurl: imageUrl,
           price: Number(editFood.price),
-          isactive: editFood.isactive
+          isactive: editFood.isactive ?? true,
+          category: editFood.foodcategory,
         })
         .eq("id", editFood.id)
 
@@ -497,12 +498,12 @@ export default function Foods() {
 
       const data = await res.json()
 
-      setEditFood({
-        ...editFood,
+      setEditFood(prev => prev ? ({
+        ...prev,
         name_en: data.title_en,
         name_zh: data.title_zh,
         name_ko: data.title_ko,
-      })
+      }) : null)
     } catch (err) {
       console.error(err)
       alert("翻訳失敗")
@@ -1175,8 +1176,11 @@ export default function Foods() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
-                  gap: "10px",
+                  gridTemplateColumns: "repeat(2, 250px)",
+                  gap: "30px",
+                  justifyContent: "center",
+                  maxWidth: "580px",
+                  margin: "0 auto",
                 }}
               >
 
@@ -1194,12 +1198,13 @@ export default function Foods() {
                   <input
                     type="text"
                     value={editFood.name_ja}
-                    onChange={(e) =>
-                      setEditFood({
-                        ...editFood,
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditFood(prev => ({
+                        ...prev!,
                         name_ja: e.target.value,
-                      })
-                    }
+                      }))
+                    }}
                     style={{
                       width: "100%",
                       height: "42px",
@@ -1322,9 +1327,11 @@ export default function Foods() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "200px 1fr 140px",
+                  gridTemplateColumns: "180px 1fr 100px",
                   gap: "10px",
                   marginTop: "18px",
+                  maxWidth: "580px",
+                  margin: "18px auto 0",
                 }}
               >
 
@@ -1345,11 +1352,11 @@ export default function Foods() {
                       if (val === "__add__") {
                         setShowEditAddCategory(true);
                       } else {
-                        setEditFood({
-                          ...editFood,
+                        setEditFood(prev => ({
+                          ...prev!,
                           category: val,
                           foodcategory: val,
-                        });
+                        }));
                       }
                     }}
                     style={{
@@ -1381,8 +1388,12 @@ export default function Foods() {
                       <button style={{ fontSize: "11px" }} onClick={() => { setShowEditAddCategory(false); setNewCategoryName(""); }}>キャンセル</button>
                       <button style={{ fontSize: "11px" }} onClick={async () => {
                         const newCat = await handleAddCategory(newCategoryName);
-                        if (newCat && editFood) {
-                          setEditFood({ ...editFood, category: newCat, foodcategory: newCat });
+                        if (newCat) {
+                          setEditFood(prev => ({
+                            ...prev!,
+                            category: newCat,
+                            foodcategory: newCat,
+                          }))
                         }
                         setShowEditAddCategory(false);
                       }}>追加</button>
@@ -1404,12 +1415,13 @@ export default function Foods() {
                   <input
                     type="text"
                     value={editFood.description || ""}
-                    onChange={(e) =>
-                      setEditFood({
-                        ...editFood,
-                        description: e.target.value,
-                      })
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditFood(prev => ({
+                        ...prev!,
+                        description: val,
+                      }))
+                    }}
                     style={{
                       width: "100%",
                       height: "40px",
@@ -1433,12 +1445,13 @@ export default function Foods() {
                   <input
                     type="number"
                     value={editFood.price || 0}
-                    onChange={(e) =>
-                      setEditFood({
-                        ...editFood,
-                        price: Number(e.target.value),
-                      })
-                    }
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setEditFood(prev => ({
+                        ...prev!,
+                        price: val,
+                      }))
+                    }}
                     style={{
                       width: "100%",
                       height: "40px",
@@ -1455,6 +1468,8 @@ export default function Foods() {
               <div
                 style={{
                   marginTop: "18px",
+                  maxWidth: "580px",
+                  margin: "18px auto 0",
                 }}
               >
                 <label
@@ -1468,12 +1483,13 @@ export default function Foods() {
                   <input
                     type="checkbox"
                     checked={editFood.isactive}
-                    onChange={(e) =>
-                      setEditFood({
-                        ...editFood,
-                        isactive: e.target.checked,
-                      })
-                    }
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setEditFood(prev => ({
+                        ...prev!,
+                        isactive: val,
+                      }))
+                    }}
                   />
 
                   表示する
@@ -1486,6 +1502,8 @@ export default function Foods() {
                   display: "flex",
                   justifyContent: "space-between",
                   marginTop: "28px",
+                  maxWidth: "580px",
+                  margin: "28px auto 0",
                 }}
               >
                 <button
@@ -1582,7 +1600,7 @@ export default function Foods() {
                             body: JSON.stringify({ title: newFood.name_ja, body: newFood.description || "" }),
                           });
                           const data = await res.json();
-                          setNewFood({ ...newFood, name_en: data.title_en, name_zh: data.title_zh, name_ko: data.title_ko });
+                          setNewFood(prev => ({ ...prev, name_en: data.title_en, name_zh: data.title_zh, name_ko: data.title_ko }));
                         } catch (err) {
                           alert("翻訳失敗");
                         } finally {

@@ -219,6 +219,7 @@ export default function Drinks() {
     if (!editDrink) return
 
     setIsSaving(true)
+
     const { error } = await supabase
       .from("world_drinks")
       .update({
@@ -226,10 +227,11 @@ export default function Drinks() {
         name_en: editDrink.name_en,
         name_zh: editDrink.name_zh,
         name_ko: editDrink.name_ko,
-        drinkcategory: editDrink.drinkcategory,
         description: editDrink.description,
+        drinkcategory: editDrink.drinkcategory,
+        category: editDrink.drinkcategory,
         price: Number(editDrink.price),
-        isactive: editDrink.isactive
+        isactive: editDrink.isactive ?? true,
       })
       .eq("id", editDrink.id)
 
@@ -330,12 +332,12 @@ export default function Drinks() {
 
       const data = await res.json()
 
-      setEditDrink({
-        ...editDrink,
+      setEditDrink(prev => ({
+        ...prev!,
         name_en: data.title_en,
         name_zh: data.title_zh,
         name_ko: data.title_ko,
-      })
+      }))
     } catch (err) {
       console.error(err)
       alert("翻訳失敗")
@@ -906,20 +908,21 @@ export default function Drinks() {
               </h2>
 
               {/* 多言語エリア */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
-                  gap: "10px",
-                }}
-              >
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 250px)",
+                gap: "30px",
+                justifyContent: "center",
+                maxWidth: "580px",
+                margin: "0 auto",
+              }}>
                 {/* 日本語 */}
                 <div>
                   <label style={{ fontSize: "16px", fontWeight: "bold" }}>日本語</label>
                   <input
                     type="text"
                     value={editDrink.name_ja}
-                    onChange={(e) => setEditDrink({ ...editDrink, name_ja: e.target.value })}
+                    onChange={(e) => setEditDrink(prev => ({ ...prev!, name_ja: e.target.value }))}
                     style={{
                       width: "100%",
                       height: "42px",
@@ -1004,25 +1007,30 @@ export default function Drinks() {
               </div>
 
               {/* 共通項目 */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 140px",
-                  gap: "10px",
-                  marginTop: "18px",
-                }}
-              >
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "120px 1fr 100px",
+                gap: "10px",
+                marginTop: "18px",
+                maxWidth: "580px",
+                margin: "18px auto 0",
+              }}>
                 {/* Category */}
                 <div>
                   <label style={{ fontSize: "14px" }}>Category</label>
                   <select
                     value={editDrink.drinkcategory}
                     onChange={(e) => {
-                      if (e.target.value === "__add__") {
+                      const val = e.target.value;
+                      if (val === "__add__") {
                         setShowAddCategory(true)
                         return
                       }
-                      setEditDrink({ ...editDrink, drinkcategory: e.target.value })
+                      setEditDrink(prev => ({
+                        ...prev!,
+                        category: val,
+                        drinkcategory: val,
+                      }))
                     }}
                     style={{ width: "100%", height: "40px", marginTop: "6px", padding: "0 10px", fontSize: "14px" }}
                   >
@@ -1045,8 +1053,12 @@ export default function Drinks() {
                         <button style={{ fontSize: "11px" }} onClick={() => { setShowAddCategory(false); setNewCategoryName(""); }}>キャンセル</button>
                         <button style={{ fontSize: "11px" }} onClick={async () => {
                           const newCat = await handleAddCategory(newCategoryName);
-                          if (newCat && editDrink) {
-                            setEditDrink({ ...editDrink, category: newCat, drinkcategory: newCat });
+                          if (newCat) {
+                            setEditDrink(prev => ({
+                              ...prev!,
+                              category: newCat,
+                              drinkcategory: newCat,
+                            }))
                           }
                           setShowAddCategory(false);
                         }}>追加</button>
@@ -1061,7 +1073,7 @@ export default function Drinks() {
                   <input
                     type="text"
                     value={editDrink.description || ""}
-                    onChange={(e) => setEditDrink({ ...editDrink, description: e.target.value })}
+                    onChange={(e) => setEditDrink(prev => ({ ...prev!, description: e.target.value }))}
                     style={{ width: "100%", height: "40px", marginTop: "6px", padding: "0 10px", fontSize: "14px" }}
                   />
                 </div>
@@ -1072,26 +1084,26 @@ export default function Drinks() {
                   <input
                     type="number"
                     value={editDrink.price === 0 ? "" : editDrink.price}
-                    onChange={(e) => setEditDrink({ ...editDrink, price: e.target.value === "" ? 0 : Number(e.target.value) })}
+                    onChange={(e) => setEditDrink(prev => ({ ...prev!, price: e.target.value === "" ? 0 : Number(e.target.value) }))}
                     style={{ width: "100%", height: "40px", marginTop: "6px", padding: "0 10px", fontSize: "14px" }}
                   />
                 </div>
               </div>
 
               {/* 表示 */}
-              <div style={{ marginTop: "18px" }}>
+              <div style={{ marginTop: "18px", maxWidth: "580px", margin: "18px auto 0" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
                   <input
                     type="checkbox"
                     checked={editDrink.isactive}
-                    onChange={(e) => setEditDrink({ ...editDrink, isactive: e.target.checked })}
+                    onChange={(e) => setEditDrink(prev => ({ ...prev!, isactive: e.target.checked }))}
                   />
                   表示する
                 </label>
               </div>
 
               {/* ボタン */}
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "28px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "28px", maxWidth: "580px", margin: "28px auto 0" }}>
                 <button onClick={() => setShowEdit(false)}>キャンセル</button>
                 <button onClick={saveEdit}>保存</button>
               </div>

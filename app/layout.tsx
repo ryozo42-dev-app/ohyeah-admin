@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { usePathname, useRouter } from "next/navigation"
 import "./globals.css"
@@ -37,6 +37,39 @@ export default function Layout({
   useEffect(() => {
     loadUser()
   }, [])
+
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const resetTimer = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+
+    timeoutRef.current = setTimeout(async () => {
+      await supabase.auth.signOut()
+      setUser(null)
+      setUserData(null)
+      alert("30分間操作がなかったためログアウトしました")
+      router.push("/dashboard")
+    }, 30 * 60 * 1000)
+  }, [router])
+
+  useEffect(() => {
+
+    resetTimer()
+
+    window.addEventListener("mousemove", resetTimer)
+    window.addEventListener("mousedown", resetTimer)
+    window.addEventListener("keydown", resetTimer)
+    window.addEventListener("touchstart", resetTimer)
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+
+      window.removeEventListener("mousemove", resetTimer)
+      window.removeEventListener("mousedown", resetTimer)
+      window.removeEventListener("keydown", resetTimer)
+      window.removeEventListener("touchstart", resetTimer)
+    }
+  }, [resetTimer])
 
   const loadUser = async () => {
 
