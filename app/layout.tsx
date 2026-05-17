@@ -47,7 +47,6 @@ export default function Layout({
       await supabase.auth.signOut()
       setUser(null)
       setUserData(null)
-      alert("30分間操作がなかったためログアウトしました")
       router.push("/dashboard")
     }, 30 * 60 * 1000)
   }, [router])
@@ -439,6 +438,14 @@ function LoginModal({
   const [resetLoading, setResetLoading] =
     useState(false)
 
+  useEffect(() => {
+
+    setEmail("")
+
+    setPassword("")
+
+  }, [])
+
   const handleLogin = async () => {
 
     const cleanEmail = email.trim().toLowerCase()
@@ -609,6 +616,9 @@ function LoginModal({
           </h2>
 
           <input
+            type="email"
+            name="fake-email"
+            autoComplete="off"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -631,6 +641,8 @@ function LoginModal({
 
             <input
               type={showPassword ? "text" : "password"}
+              name="fake-password"
+              autoComplete="new-password"
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
