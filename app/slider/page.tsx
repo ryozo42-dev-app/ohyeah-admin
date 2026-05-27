@@ -14,7 +14,7 @@ type SliderImage = {
 
 type News = {
   id: number
-  title: string
+  title_ja: string
 }
 
 export default function Page() {
@@ -42,8 +42,8 @@ export default function Page() {
     if (data) setSliders(data as SliderImage[])
 
     const { data: newsData } = await supabase
-      .from("news")
-      .select("id, title")
+      .from("world_news")
+      .select("*")
 
     if (newsData) setNewsList(newsData as News[])
   }
@@ -253,7 +253,7 @@ export default function Page() {
               <p style={{ fontSize: "12px", color: "#333" }}>
                 現在：
                 {selectedNewsId
-                  ? newsList.find((n) => n.id === selectedNewsId)?.title
+                  ? newsList.find((n) => n.id === selectedNewsId)?.title_ja
                   : "リンクなし"}
               </p>
 
@@ -274,7 +274,7 @@ export default function Page() {
 
                 {newsList.map((n) => (
                   <option key={n.id} value={n.id}>
-                    {n.title}
+                    {n.title_ja}
                   </option>
                 ))}
               </select>

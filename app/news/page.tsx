@@ -275,6 +275,7 @@ export default function Page() {
 
     // 翻訳API呼び出しのtry-catchブロック
     try {
+      setIsTranslating(true)
       const translateRes = await fetch(
         "https://ikezocnvlrhluxhxwfug.supabase.co/functions/v1/translate-news",
         {
@@ -299,6 +300,8 @@ export default function Page() {
     } catch (translationError) {
       console.error("Failed to call translation API or parse response:", translationError)
       // 翻訳失敗しても、日本語データで保存を続行するため、translatedは初期値の空文字列のまま
+    } finally {
+      setIsTranslating(false)
     }
 
   } catch (err) {
@@ -322,7 +325,10 @@ export default function Page() {
       body_ko: translated.body_ko,
       imageurl: imageUrl,
       ispublished: newNews.isPublished,
-      createdat: new Date().toISOString()
+      createdat:
+  new Date(
+    Date.now() + 9 * 60 * 60 * 1000
+  ),
     })
     .select()
     .single()
@@ -914,8 +920,8 @@ export default function Page() {
             maxHeight: "90vh",
             overflowY: "auto"
           }}>
-            {/* 保存中のオーバーレイ表示 */}
-            {isSaving && (
+            {/* 翻訳中・保存中のオーバーレイ表示 */}
+            {(isTranslating || isSaving) && (
               <div style={{
                 position: "absolute",
                 inset: 0,
@@ -935,7 +941,9 @@ export default function Page() {
                   fontWeight: "bold",
                   fontSize: "14px",
                   letterSpacing: "0.1em"
-                }}>保存中...</p>
+                }}>
+                  {isTranslating ? "AI翻訳中..." : "保存中..."}
+                </p>
                 <style>{`
                   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
                   .loader {

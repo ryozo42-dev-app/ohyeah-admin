@@ -2,34 +2,47 @@ import { NextResponse } from "next/server"
 import admin from "firebase-admin"
 
 const serviceAccount = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  projectId:
+    process.env.FIREBASE_PROJECT_ID,
+
+  clientEmail:
+    process.env.FIREBASE_CLIENT_EMAIL,
+
   privateKey:
-    process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    process.env.FIREBASE_PRIVATE_KEY
+      ?.replace(/\\\\n/g, "\n")
+      .replace(/\\n/g, "\n"),
 }
 
 if (!admin.apps.length) {
 
   admin.initializeApp({
+
     credential:
       admin.credential.cert(
         serviceAccount as admin.ServiceAccount
-      )
+      ),
+
   })
 
 }
 
-export async function POST(req: Request) {
+export async function POST(
+  req: Request
+) {
 
   try {
 
-    const body = await req.json()
+    const body =
+      await req.json()
 
     const title =
-      body.title || "新着ニュース"
+      body.title ||
+      "新着ニュース"
 
     const message =
-      body.message || "ニュースが追加されました"
+      body.message ||
+      "ニュースが追加されました"
 
     const newsId =
       String(body.newsId || "")
@@ -41,28 +54,42 @@ export async function POST(req: Request) {
 
         notification: {
           title,
-          body: message
+          body: message,
         },
 
         data: {
+
           newsId,
+
           click_action:
-            "FLUTTER_NOTIFICATION_CLICK"
+            "FLUTTER_NOTIFICATION_CLICK",
+
         },
 
         android: {
+
           priority: "high",
+
           notification: {
+
             sound: "default",
-            channelId: "default",
-          }
+
+            channelId:
+              "high_importance_channel",
+
+          },
+
         },
 
         apns: {
 
           headers: {
+
             "apns-priority": "10",
-            "apns-push-type": "alert"
+
+            "apns-push-type":
+              "alert",
+
           },
 
           payload: {
@@ -71,7 +98,7 @@ export async function POST(req: Request) {
 
               alert: {
                 title,
-                body: message
+                body: message,
               },
 
               sound: "default",
@@ -80,13 +107,13 @@ export async function POST(req: Request) {
 
               contentAvailable: true,
 
-              mutableContent: true
+              mutableContent: true,
 
-            }
+            },
 
-          }
+          },
 
-        }
+        },
 
       })
 
@@ -96,7 +123,7 @@ export async function POST(req: Request) {
     )
 
     return NextResponse.json({
-      success: true
+      success: true,
     })
 
   } catch (err) {
@@ -107,8 +134,11 @@ export async function POST(req: Request) {
     )
 
     return NextResponse.json({
+
       success: false,
-      error: String(err)
+
+      error: String(err),
+
     })
 
   }
