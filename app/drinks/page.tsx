@@ -22,7 +22,7 @@ type Drink = {
 
   isactive: boolean
 
-  displayorder?: number
+  display_order?: number
 
   createdat?: Date | null
 }
@@ -107,7 +107,7 @@ export default function Drinks() {
 
         isactive: d.isactive ?? true,
 
-        displayorder: d.displayorder || 0,
+        display_order: d.display_order || 0,
 
         createdat: d.createdat
           ? new Date(d.createdat)
@@ -126,11 +126,11 @@ export default function Drinks() {
       ]
 
       const sortedData = [...list].sort((a, b) => {
-        // ① カテゴリー（drinkcategory）のソート
         const idxA = priorityOrder.indexOf(a.drinkcategory)
         const idxB = priorityOrder.indexOf(b.drinkcategory)
 
         let catComp = 0
+
         if (idxA !== -1 && idxB !== -1) {
           catComp = idxA - idxB
         } else if (idxA !== -1) {
@@ -143,12 +143,8 @@ export default function Drinks() {
 
         if (catComp !== 0) return catComp
 
-        // ② 名前（name_ja）のソート
-        const nameComp = a.name_ja.localeCompare(b.name_ja);
-        if (nameComp !== 0) return nameComp;
-
-        // ③ 価格（price）のソート
-        return a.price - b.price;
+        return (a.display_order ?? 9999)
+          - (b.display_order ?? 9999)
       });
       setDrinks(sortedData);
     } else {
@@ -368,6 +364,73 @@ export default function Drinks() {
   // addCategoryはもう使わないので削除
   // const addCategory = async () => { ... }
 
+  const moveUp = async (id: number) => {
+    const current = drinks.find(d => d.id === id)
+    if (!current) return
+
+    const sameCategory = drinks
+      .filter(d => d.drinkcategory === current.drinkcategory)
+      .sort((a, b) =>
+        (a.display_order ?? 9999) -
+        (b.display_order ?? 9999)
+      )
+
+    const index = sameCategory.findIndex(
+      d => d.id === id
+    )
+
+    if (index <= 0) return
+
+    const prev = sameCategory[index - 1]
+
+    await supabase
+      .from("world_drinks")
+      .update({
+        display_order: prev.display_order
+      })
+      .eq("id", current.id)
+
+    await supabase
+      .from("world_drinks")
+      .update({
+        display_order: current.display_order
+      })
+      .eq("id", prev.id)
+
+    load()
+  }
+
+  const moveDown = async (id: number) => {
+    const current = drinks.find(d => d.id === id)
+    if (!current) return
+
+    const sameCategory = drinks
+      .filter(d => d.drinkcategory === current.drinkcategory)
+      .sort((a, b) =>
+        (a.display_order ?? 9999) -
+        (b.display_order ?? 9999)
+      )
+
+    const index = sameCategory.findIndex(
+      d => d.id === id
+    )
+
+    if (index === -1 || index >= sameCategory.length - 1) return
+
+    const next = sameCategory[index + 1]
+
+    await supabase
+      .from("world_drinks")
+      .update({ display_order: next.display_order })
+      .eq("id", current.id)
+
+    await supabase
+      .from("world_drinks")
+      .update({ display_order: current.display_order })
+      .eq("id", next.id)
+
+    load()
+  }
 
   const bulkDelete = async () => {
     if (selected.length === 0) {
@@ -460,7 +523,7 @@ export default function Drinks() {
     }
 
     // ヘッダー
-    const header = ["id", "name_ja", "name_en", "name_zh", "name_ko", "drinkcategory", "description", "price", "imageurl", "isactive", "displayorder"]
+    const header = ["id", "name_ja", "name_en", "name_zh", "name_ko", "drinkcategory", "description", "price", "imageurl", "isactive", "display_order"]
 
     // データ
     const rows = drinks.map(item => [
@@ -469,12 +532,12 @@ export default function Drinks() {
       item.name_en || "",
       item.name_zh || "",
       item.name_ko || "",
-      item.drinkcategory,
+      item.drinkcategory || "",
       item.description || "",
       item.price,
       item.imageurl || "",
       item.isactive,
-      item.displayorder || 0
+      item.display_order || 0
     ])
 
     // CSV文字列作成
@@ -648,6 +711,26 @@ export default function Drinks() {
                   padding: "2px 4px"
                 }}
               >
+                <button
+                  style={{
+                    fontSize: "11px",
+                    padding: "1px 4px"
+                  }}
+                  onClick={() => moveUp(item.id)}
+                >
+                  ↑
+                </button>
+
+                <button
+                  style={{
+                    fontSize: "11px",
+                    padding: "1px 4px"
+                  }}
+                  onClick={() => moveDown(item.id)}
+                >
+                  ↓
+                </button>
+
                 <button
                   style={{ fontSize: "11px", padding: "1px 6px" }}
                   onClick={() => {
@@ -951,7 +1034,7 @@ export default function Drinks() {
                   <input
                     type="text"
                     value={editDrink.name_en || ""}
-                    readOnly
+                    onChange={(e) => setEditDrink(prev => ({ ...prev!, name_en: e.target.value }))}
                     style={{
                       width: "100%",
                       height: "42px",
@@ -960,7 +1043,6 @@ export default function Drinks() {
                       padding: "0 10px",
                       borderRadius: "8px",
                       border: "1px solid #ccc",
-                      background: "#f5f5f5",
                     }}
                   />
                 </div>
@@ -971,7 +1053,7 @@ export default function Drinks() {
                   <input
                     type="text"
                     value={editDrink.name_zh || ""}
-                    readOnly
+                    onChange={(e) => setEditDrink(prev => ({ ...prev!, name_zh: e.target.value }))}
                     style={{
                       width: "100%",
                       height: "42px",
@@ -980,7 +1062,6 @@ export default function Drinks() {
                       padding: "0 10px",
                       borderRadius: "8px",
                       border: "1px solid #ccc",
-                      background: "#f5f5f5",
                     }}
                   />
                 </div>
@@ -991,7 +1072,7 @@ export default function Drinks() {
                   <input
                     type="text"
                     value={editDrink.name_ko || ""}
-                    readOnly
+                    onChange={(e) => setEditDrink(prev => ({ ...prev!, name_ko: e.target.value }))}
                     style={{
                       width: "100%",
                       height: "42px",
@@ -1000,7 +1081,6 @@ export default function Drinks() {
                       padding: "0 10px",
                       borderRadius: "8px",
                       border: "1px solid #ccc",
-                      background: "#f5f5f5",
                     }}
                   />
                 </div>
@@ -1210,8 +1290,8 @@ export default function Drinks() {
                   <input
                     type="text"
                     value={newDrink.name_en || ""}
-                    readOnly
-                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc", background: "#f5f5f5" }}
+                    onChange={(e) => setNewDrink({ ...newDrink, name_en: e.target.value })}
+                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc" }}
                   />
                 </div>
 
@@ -1221,8 +1301,8 @@ export default function Drinks() {
                   <input
                     type="text"
                     value={newDrink.name_zh || ""}
-                    readOnly
-                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc", background: "#f5f5f5" }}
+                    onChange={(e) => setNewDrink({ ...newDrink, name_zh: e.target.value })}
+                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc" }}
                   />
                 </div>
 
@@ -1232,8 +1312,8 @@ export default function Drinks() {
                   <input
                     type="text"
                     value={newDrink.name_ko || ""}
-                    readOnly
-                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc", background: "#f5f5f5" }}
+                    onChange={(e) => setNewDrink({ ...newDrink, name_ko: e.target.value })}
+                    style={{ width: "100%", height: "42px", marginTop: "6px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ccc" }}
                   />
                 </div>
               </div>
