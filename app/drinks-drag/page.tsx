@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 
 import {
   DndContext,
@@ -11,7 +11,9 @@ import {
   arrayMove,
   SortableContext,
   verticalListSortingStrategy,
+  useSortable,
 } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 import { supabase } from "@/lib/supabase"
 
@@ -37,6 +39,41 @@ type Drink = {
   display_order?: number
 
   createdat?: Date | null
+}
+
+function SortableRow({
+  item,
+  children,
+}: {
+  item: Drink
+  children: React.ReactNode
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({
+    id: item.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: item.isactive ? 1 : 0.4,
+  }
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
+    </tr>
+  )
 }
 
 export default function Drinks() {
@@ -444,6 +481,62 @@ export default function Drinks() {
     load()
   }
 
+  const handleDragEnd = async (event: any) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) return
+
+    const oldIndex = drinks.findIndex(
+      d => d.id === active.id
+    )
+
+    const newIndex = drinks.findIndex(
+      d => d.id === over.id
+    )
+
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const current = drinks[oldIndex]
+    const target = drinks[newIndex]
+
+    // カテゴリー跨ぎ禁止
+    if (
+      current.drinkcategory !==
+      target.drinkcategory
+    ) {
+      alert("カテゴリーを跨いで移動できません")
+      return
+    }
+
+    const reordered = arrayMove(
+      drinks,
+      oldIndex,
+      newIndex
+    )
+
+    setDrinks(reordered)
+
+    // display_order再計算
+    const updates = reordered.map(
+      (item, index) => ({
+        id: item.id,
+        display_order: index + 1,
+      })
+    )
+
+    for (const row of updates) {
+      await supabase
+        .from("world_drinks")
+        .update({
+          display_order:
+            row.display_order,
+        })
+        .eq("id", row.id)
+    }
+
+    await load()
+  }
+
   const bulkDelete = async () => {
     if (selected.length === 0) {
       alert("選択されていません")
@@ -614,7 +707,17 @@ export default function Drinks() {
 
       {/* 画面表示用エリア（ページネーション・ボタン・操作用テーブル） */}
       <div className="no-print">
-        <table
+
+  <DndContext
+    collisionDetection={closestCenter}
+    onDragEnd={handleDragEnd}
+  >
+    <SortableContext
+      items={view.map(item => item.id)}
+      strategy={verticalListSortingStrategy}
+    >
+
+      <table
         style={{
           width: "100%",
           tableLayout: "fixed",
@@ -643,138 +746,146 @@ export default function Drinks() {
           </tr>
         </thead>
 
-        <tbody>
-          {view.map(item => (
-            <tr
-              key={item.id}
-              style={{ opacity: item.isactive ? 1 : 0.4 }}
-            >
-              <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(item.id)}
-                  onChange={() => toggle(item.id)}
-                  style={{ transform: "scale(0.8)" }}
-                />
-              </td>
-
-              <td style={{ border: "1px solid #ddd", padding: "2px 4px", whiteSpace: "nowrap" }}>
-                {item.name_ja}
-              </td>
-
-              <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
-                {item.name_en}
-              </td>
-
-              <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
-                {item.drinkcategory}
-              </td>
-
-              {/* 👇 説明は広く＋省略なし */}
-              <td
-                style={{
-                  border: "1px solid #ddd",
-                  padding: "2px 4px",
-                  whiteSpace: "normal",
-                  textAlign: "left"
-                }}
-              >
-                {item.description || "-"}
-              </td>
-
-              <td style={{ border: "1px solid #ddd", padding: "2px 4px", textAlign: "right" }}>
-                ¥{item.price}
-              </td>
-
-              <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
-                <input
-                  type="checkbox"
-                  checked={item.isactive}
-                  onChange={async (e) => {
-                    const checked = e.target.checked
-
-                    // DB更新
-                    const { error } = await supabase
-                      .from("world_drinks")
-                      .update({ isactive: checked })
-                      .eq("id", item.id)
-
-                    if (error) {
-                      alert("更新失敗")
-                      return
-                    }
-
-                    // UI更新（即反映）
-                    setDrinks(drinks.map(x =>
-                      x.id === item.id ? { ...x, isactive: checked } : x
-                    ))
-                  }}
-                />
-              </td>
-
-              <td
-                style={{
-                  border: "1px solid #ddd",
-                  whiteSpace: "nowrap",
-                  display: "flex", // Flexboxを有効にする
-                  justifyContent: "center", // 水平方向の中央揃え
-                  alignItems: "center", // 垂直方向の中央揃え
-                  height: "30px", // セルの高さを明示的に指定して中央揃えを安定させる
-                  padding: "2px 4px"
-                }}
-              >
-                <button
-                  style={{
-                    fontSize: "11px",
-                    padding: "1px 4px"
-                  }}
-                  onClick={() => moveUp(item.id)}
+            <tbody>
+              {view.map(item => (
+                <SortableRow
+                  key={item.id}
+                  item={item}
                 >
-                  ↑
-                </button>
+                  <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(item.id)}
+                      onChange={() => toggle(item.id)}
+                      style={{ transform: "scale(0.8)" }}
+                    />
+                  </td>
 
-                <button
-                  style={{
-                    fontSize: "11px",
-                    padding: "1px 4px"
-                  }}
-                  onClick={() => moveDown(item.id)}
-                >
-                  ↓
-                </button>
+                  <td
+                    style={{
+                      border: "1px solid #ddd",
+                      padding: "2px 4px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {item.name_ja}
+                  </td>
 
-                <button
-                  style={{ fontSize: "11px", padding: "1px 6px" }}
-                  onClick={() => {
-                    setEditDrink(item)
-                    setShowEdit(true)
-                  }}
-                >
-                  編集
-                </button>
+                  <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
+                    {item.name_en}
+                  </td>
 
-                <button
-                  style={{
-                    fontSize: "11px",
-                    padding: "1px 6px",
-                    color: "red",
-                    opacity: isAdmin ? 1 : 0.4,
-                    cursor: isAdmin ? "pointer" : "not-allowed"
-                  }}
-                  disabled={!isAdmin}
-                  onClick={() => {
-                    if (!confirm("このドリンクを削除しますか？")) return
-                    handleDelete(item.id)
-                  }}
-                >
-                  削除
-                </button>
-              </td>
-            </tr>
-          ))}
+                  <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
+                    {item.drinkcategory}
+                  </td>
+
+                  {/* 👇 説明は広く＋省略なし */}
+                  <td
+                    style={{
+                      border: "1px solid #ddd",
+                      padding: "2px 4px",
+                      whiteSpace: "normal",
+                      textAlign: "left"
+                    }}
+                  >
+                    {item.description || "-"}
+                  </td>
+
+                  <td style={{ border: "1px solid #ddd", padding: "2px 4px", textAlign: "right" }}>
+                    ¥{item.price}
+                  </td>
+
+                  <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
+                    <input
+                      type="checkbox"
+                      checked={item.isactive}
+                      onChange={async (e) => {
+                        const checked = e.target.checked
+
+                        // DB更新
+                        const { error } = await supabase
+                          .from("world_drinks")
+                          .update({ isactive: checked })
+                          .eq("id", item.id)
+
+                        if (error) {
+                          alert("更新失敗")
+                          return
+                        }
+
+                        // UI更新（即反映）
+                        setDrinks(drinks.map(x =>
+                          x.id === item.id ? { ...x, isactive: checked } : x
+                        ))
+                      }}
+                    />
+                  </td>
+
+                  <td
+                    style={{
+                      border: "1px solid #ddd",
+                      whiteSpace: "nowrap",
+                      display: "flex", // Flexboxを有効にする
+                      justifyContent: "center", // 水平方向の中央揃え
+                      alignItems: "center", // 垂直方向の中央揃え
+                      height: "30px", // セルの高さを明示的に指定して中央揃えを安定させる
+                      padding: "2px 4px"
+                    }}
+                  >
+                    <button
+                      style={{
+                        fontSize: "11px",
+                        padding: "1px 4px"
+                      }}
+                      onClick={() => moveUp(item.id)}
+                    >
+                      ↑
+                    </button>
+
+                    <button
+                      style={{
+                        fontSize: "11px",
+                        padding: "1px 4px"
+                      }}
+                      onClick={() => moveDown(item.id)}
+                    >
+                      ↓
+                    </button>
+
+                    <button
+                      style={{ fontSize: "11px", padding: "1px 6px" }}
+                      onClick={() => {
+                        setEditDrink(item)
+                        setShowEdit(true)
+                      }}
+                    >
+                      編集
+                    </button>
+
+                    <button
+                      style={{
+                        fontSize: "11px",
+                        padding: "1px 6px",
+                        color: "red",
+                        opacity: isAdmin ? 1 : 0.4,
+                        cursor: isAdmin ? "pointer" : "not-allowed"
+                      }}
+                      disabled={!isAdmin}
+                      onClick={() => {
+                        if (!confirm("このドリンクを削除しますか？")) return;
+                        handleDelete(item.id);
+                      }}
+                    >
+                      削除
+                    </button>
+                  </td>
+                </SortableRow>
+              ))}
         </tbody>
-        </table>
+      </table>
 
+      </SortableContext>
+    </DndContext>
         <div style={{ marginTop: "10px", fontSize: "14px", color: "#666" }}>
         選択中: {selected.length} 件
       </div>
@@ -897,6 +1008,7 @@ export default function Drinks() {
         <tbody>
           {drinks.map(item => (
             <tr key={item.id} style={{ opacity: item.isactive ? 1 : 0.4 }}>
+              <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}></td>
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}></td>
               <td style={{ border: "1px solid #ddd", padding: "2px 4px", whiteSpace: "nowrap" }}>
                 {item.name_ja}
