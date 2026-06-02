@@ -68,9 +68,21 @@ function SortableRow({
     <tr
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
     >
+      <td
+        {...attributes}
+        {...listeners}
+        style={{
+          width: "40px",
+          textAlign: "center",
+          cursor: "grab",
+          border: "1px solid #ddd",
+          fontWeight: "bold",
+        }}
+      >
+        ☰
+      </td>
+
       {children}
     </tr>
   )
@@ -729,6 +741,7 @@ export default function Drinks() {
       >
         <thead>
           <tr style={{ background: "#ddd" }}>
+            <th style={{ width: "40px" }}></th>
             <th style={{ width: "3%" }}>
               <input
                 type="checkbox"
@@ -854,7 +867,9 @@ export default function Drinks() {
 
                     <button
                       style={{ fontSize: "11px", padding: "1px 6px" }}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation()
+
                         setEditDrink(item)
                         setShowEdit(true)
                       }}
@@ -995,6 +1010,7 @@ export default function Drinks() {
       >
         <thead>
           <tr style={{ background: "#ddd" }}>
+            <th style={{ width: "40px" }}></th>
             <th style={{ width: "3%" }}></th>
             <th style={{ width: "18%", textAlign: "center" }}>名前</th>
             <th style={{ width: "18%", textAlign: "center" }}>英語名</th>
