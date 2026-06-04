@@ -10,7 +10,8 @@ import {
   Beer,
   Utensils,
   Newspaper,
-  Image
+  Image,
+  ListOrdered
 } from "lucide-react"
 import Link from "next/link"
 

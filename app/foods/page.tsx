@@ -39,7 +39,7 @@ export default function Foods() {
   const [editFood, setEditFood] = useState<Food | null>(null)
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
-  const [categories, setCategories] = useState<string[]>([])
+  const [categories, setCategories] = useState<any[]>([])
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<string | null>(null);
   const [selectedFilterPrice, setSelectedFilterPrice] = useState<string | null>(null);
   const [showPriceModal, setShowPriceModal] = useState(false)
@@ -56,6 +56,7 @@ export default function Foods() {
   const [targetFood, setTargetFood] = useState<any>(null)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [customAlert, setCustomAlert] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
   const [newFood, setNewFood] = useState({
     name_ja: "",
     name_en: "",
@@ -67,6 +68,10 @@ export default function Foods() {
     imageurl: "",
     isactive: true
   })
+
+  const showAlert = (message: string) => {
+    setCustomAlert({ show: true, message });
+  };
 
   const perPage = 6
 
@@ -109,37 +114,23 @@ export default function Foods() {
         price: d.price || 0,
         imageurl: d.imageurl || "",
         isactive: d.isactive ?? true,
-        displayorder: d.displayorder || 0,
+        displayorder: d.display_order || 0,
         createdat: d.createdat ? new Date(d.createdat) : null,
       }))
 
-      // 指定された特定のカテゴリー順序
-      const priorityOrder = ["PIZZA", "FRIDE", "OHTER"];
+      // DBから取得したカテゴリーの並び順（display_order）を動的に反映
+      const priorityOrder = categories.map((c) => c.name);
 
       const sortedData = [...list].sort((a, b) => {
-        // ① カテゴリー（foodcategory）のソート
-        const idxA = priorityOrder.indexOf(a.foodcategory);
-        const idxB = priorityOrder.indexOf(b.foodcategory);
+        const idxA = priorityOrder.indexOf(a.foodcategory || "");
+        const idxB = priorityOrder.indexOf(b.foodcategory || "");
 
-        let catComp = 0;
-        if (idxA !== -1 && idxB !== -1) {
-          catComp = idxA - idxB;
-        } else if (idxA !== -1) {
-          catComp = -1;
-        } else if (idxB !== -1) {
-          catComp = 1;
-        } else {
-          catComp = a.foodcategory.localeCompare(b.foodcategory);
+        if (idxA !== idxB) {
+          return idxA - idxB;
         }
 
-        if (catComp !== 0) return catComp;
-
-        // ② 名前（name_ja）のソート
-        const nameComp = a.name_ja.localeCompare(b.name_ja);
-        if (nameComp !== 0) return nameComp;
-
-        // ③ 価格（price）のソート
-        return a.price - b.price;
+        return (a.displayorder ?? 9999)
+          - (b.displayorder ?? 9999);
       });
 
       setFoods(sortedData);
@@ -151,7 +142,7 @@ export default function Foods() {
   useEffect(() => {
     fetchFoods()
     loadUser()
-  }, [selectedFilterCategory, selectedFilterPrice]); // フィルター状態が変更されたら再フェッチ
+  }, [selectedFilterCategory, selectedFilterPrice, categories]); // カテゴリー情報の読み込み完了時にも再フェッチ
 
   // 📸 メモリリーク防止: previewImageが変わるたびに古いObjectURLを解放
   useEffect(() => {
@@ -178,13 +169,13 @@ export default function Foods() {
     const loadCategories = async () => {
       const { data, error } = await supabase
         .from("food_categories")
-        .select("name")
-        .order("name")
+        .select("*")
+        .order("display_order")
 
       console.log(data, error)
 
       if (data) {
-        setCategories(data.map(c => c.name))
+        setCategories(data)
       }
     }
 
@@ -232,7 +223,7 @@ export default function Foods() {
 
   const handleImageUpdate = async () => {
     if (!targetFood || !selectedFile) {
-      alert("画像を選択してください")
+      showAlert("画像を選択してください")
       return
     }
     setUploading(true)
@@ -250,7 +241,7 @@ export default function Foods() {
         .eq("id", targetFood.id)
 
       if (updateError) {
-        alert("更新失敗")
+        showAlert("更新失敗")
         return
       }
 
@@ -276,7 +267,7 @@ export default function Foods() {
       setSelectedFile(null)
       setPreviewImage(null)
     } catch (error: any) {
-      alert(error.message || String(error));
+      showAlert(error.message || String(error));
     } finally {
       setUploading(false)
       setIsSaving(false)
@@ -317,7 +308,7 @@ export default function Foods() {
 
       if (error) {
         console.error("UPDATE ERROR:", error)
-        alert(`保存に失敗しました: ${error.message}`)
+        showAlert(`保存に失敗しました: ${error.message}`)
         return
       }
 
@@ -348,7 +339,7 @@ export default function Foods() {
       setSelectedFile(null)
       setPreviewImage(null)
     } catch (error: any) {
-      alert(error.message || String(error));
+      showAlert(error.message || String(error));
       setIsSaving(false)
     } finally {
       setUploading(false)
@@ -391,12 +382,12 @@ export default function Foods() {
 
   const addFood = async () => {
     if (!newFood.name_ja.trim()) {
-      alert("名前を入力してください")
+      showAlert("名前を入力してください")
       return
     }
 
     if (!selectedFile) {
-      alert("画像を選択してください")
+      showAlert("画像を選択してください")
       return
     }
 
@@ -426,7 +417,7 @@ export default function Foods() {
         .select()
 
       if (error) {
-        alert(error.message)
+        showAlert(error.message)
         setIsSaving(false)
         setUploading(false)
         return
@@ -470,7 +461,7 @@ export default function Foods() {
 
     } catch (e) {
       console.error(e)
-      alert("登録失敗")
+      showAlert("登録失敗")
     } finally {
       setUploading(false)
       setIsSaving(false)
@@ -506,7 +497,7 @@ export default function Foods() {
       }) : null)
     } catch (err) {
       console.error(err)
-      alert("翻訳失敗")
+      showAlert("翻訳失敗")
     } finally {
       setIsTranslating(false)
     }
@@ -514,7 +505,7 @@ export default function Foods() {
 
   const handleAddCategory = async (categoryName: string) => {
     if (!categoryName.trim()) {
-      alert("カテゴリー名を入力してください")
+      showAlert("カテゴリー名を入力してください")
       return null
     }
     const name = categoryName.trim().toUpperCase()
@@ -522,19 +513,98 @@ export default function Foods() {
       .from("food_categories")
       .insert([{ name }])
     if (error) {
-      alert("カテゴリーの追加に失敗しました: " + error.message)
+      showAlert("カテゴリーの追加に失敗しました: " + error.message)
       return null
     }
-    const updated = [...categories, name].sort()
+    // ステートの構造（オブジェクト配列）を維持
+    const updated = [...categories, { name }].sort((a, b) => (a.name || "").localeCompare(b.name || ""))
     setCategories(updated)
     setNewCategoryName("")
     return name
   }
 
+  const moveUp = async (item: Food) => {
+    const idx = foods.findIndex((f) => f.id === item.id);
+    if (idx <= 0) return; // 一番上の場合は何もしない
+
+    const target = foods[idx - 1];
+
+    if (!target) return
+
+    if (target.foodcategory !== item.foodcategory) {
+      return
+    }
+
+    // 異なるカテゴリー間での移動は制限（必要に応じて）
+    if (target.foodcategory !== item.foodcategory) {
+      showAlert("カテゴリーを跨いで移動することはできません。")
+      return
+    }
+
+    let newOrderForItem = target.displayorder ?? 0;
+    let newOrderForTarget = item.displayorder ?? 0;
+
+    // 同じ値（例：共に0）だった場合は明示的に差をつける
+    if (newOrderForItem === newOrderForTarget) {
+      newOrderForTarget = newOrderForItem + 1;
+    }
+
+    await Promise.all([
+      supabase
+        .from("world_foods")
+        .update({ display_order: newOrderForItem })
+        .eq("id", item.id),
+      supabase
+        .from("world_foods")
+        .update({ display_order: newOrderForTarget })
+        .eq("id", target.id),
+    ]);
+
+    await fetchFoods();
+  }
+
+  const moveDown = async (item: Food) => {
+    const idx = foods.findIndex((f) => f.id === item.id);
+    if (idx === -1 || idx >= foods.length - 1) return; // 一番下の場合は何もしない
+
+    const target = foods[idx + 1];
+
+    if (!target) return
+
+    if (target.foodcategory !== item.foodcategory) {
+      return
+    }
+
+    if (target.foodcategory !== item.foodcategory) {
+      showAlert("カテゴリーを跨いで移動することはできません。")
+      return
+    }
+
+    let newOrderForItem = target.displayorder ?? 0;
+    let newOrderForTarget = item.displayorder ?? 0;
+
+    if (newOrderForItem === newOrderForTarget) {
+      newOrderForItem = newOrderForTarget + 1;
+    }
+
+    await Promise.all([
+      supabase
+        .from("world_foods")
+        .update({ display_order: newOrderForItem })
+        .eq("id", item.id),
+      supabase
+        .from("world_foods")
+        .update({ display_order: newOrderForTarget })
+        .eq("id", target.id),
+    ]);
+
+    await fetchFoods();
+  }
+
   const bulkDelete = async () => {
 
     if (selected.length === 0) {
-      alert("選択されていません")
+      showAlert("選択されていません")
       return
     }
 
@@ -605,12 +675,12 @@ export default function Foods() {
 
   const bulkUpdateCategory = async () => {
     if (selected.length === 0) {
-      alert("選択されていません")
+      showAlert("選択されていません")
       return
     }
 
     if (!bulkCategory) {
-      alert("カテゴリーを選択してください")
+      showAlert("カテゴリーを選択してください")
       return
     }
 
@@ -701,8 +771,13 @@ export default function Foods() {
             style={{ padding: "5px", borderRadius: "4px", border: "1px solid #ccc" }}
           >
             <option value="">全て</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
+            {categories.map((c) => (
+              <option
+                key={c.name}
+                value={c.name}
+              >
+                {c.name}
+              </option>
             ))}
           </select>
         </div>
@@ -886,6 +961,26 @@ export default function Foods() {
                 }}
               >
                 <button
+                  style={{
+                    fontSize: "11px",
+                    padding: "1px 4px"
+                  }}
+                  onClick={() => moveUp(item)}
+                >
+                  ↑
+                </button>
+
+                <button
+                  style={{
+                    fontSize: "11px",
+                    padding: "1px 4px"
+                  }}
+                  onClick={() => moveDown(item)}
+                >
+                  ↓
+                </button>
+
+                <button
                   style={{ fontSize: "11px", padding: "1px 6px" }}
                   onClick={() => {
                     setEditFood(item)
@@ -969,7 +1064,7 @@ export default function Foods() {
           style={{ fontSize: "12px" }}
           onClick={() => {
             if (selected.length === 0) {
-              alert("選択されていません")
+                showAlert("選択されていません")
               return
             }
             setShowPriceModal(true)
@@ -979,7 +1074,7 @@ export default function Foods() {
           style={{ fontSize: "12px" }}
           onClick={() => {
             if (selected.length === 0) {
-              alert("選択されていません")
+                showAlert("選択されていません")
               return
             }
             setShowCategoryModal(true)
@@ -1371,7 +1466,12 @@ export default function Foods() {
                   <option value="">選択してください</option>
                   <option value="__add__">＋ カテゴリー追加</option>
                   {categories.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option
+                      key={c.name}
+                      value={c.name}
+                    >
+                      {c.name}
+                    </option>
                   ))}
 
                 </select>
@@ -1670,7 +1770,14 @@ export default function Foods() {
                   >
                     <option value="">選択してください</option>
                     <option value="__add__">＋ カテゴリー追加</option>
-                    {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
+                    {categories.map((c) => (
+                      <option
+                        key={c.name}
+                        value={c.name}
+                      >
+                        {c.name}
+                      </option>
+                    ))}
                   </select>
                   {showAddCategory && (
                     <div style={{ marginTop: "10px", padding: "10px", background: "#f9f9f9", border: "1px solid #ddd" }}>
@@ -1853,8 +1960,13 @@ export default function Foods() {
               <option value="">選択してください</option>
               <option value="__add__">＋ カテゴリー追加</option>
 
-              {categories.map(c => (
-                <option key={c} value={c}>{c}</option>
+              {categories.map((c) => (
+                <option
+                  key={c.name}
+                  value={c.name}
+                >
+                  {c.name}
+                </option>
               ))}
             </select>
 
@@ -2015,7 +2127,7 @@ export default function Foods() {
 
                   if (!selectedFile) {
                     console.log("❌ selectedFileなし")
-                    alert("画像を選択してください")
+                      showAlert("画像を選択してください")
                     return
                   }
 
@@ -2031,6 +2143,71 @@ export default function Foods() {
           </div>
         </div>
       )}
+
+      {/* カスタムアラートモーダル */}
+      {customAlert.show && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          background: "rgba(0,0,0,0.3)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 20000,
+          animation: "fadeIn 0.2s ease"
+        }}>
+          <div style={{
+            background: "#fff",
+            width: "320px",
+            borderRadius: "12px",
+            boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+            overflow: "hidden",
+            animation: "popIn 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55)"
+          }}>
+            <div style={{ height: "8px", background: "#8B5E3C" }} />
+            <div style={{ padding: "24px", textAlign: "center" }}>
+              <p style={{ 
+                fontSize: "16px", 
+                fontWeight: "bold", 
+                color: "#333",
+                marginBottom: "20px",
+                lineHeight: "1.5"
+              }}>
+                {customAlert.message}
+              </p>
+              <button
+                onClick={() => setCustomAlert({ show: false, message: "" })}
+                style={{
+                  padding: "8px 30px",
+                  background: "#8B5E3C",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "20px",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  transition: "opacity 0.2s"
+                }}
+                onMouseOver={(e) => (e.currentTarget.style.opacity = "0.8")}
+                onMouseOut={(e) => (e.currentTarget.style.opacity = "1")}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+          <style>{`
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes popIn { 
+              from { transform: scale(0.8); opacity: 0; } 
+              to { transform: scale(1); opacity: 1; } 
+            }
+          `}</style>
+        </div>
+      )}
+
     </div>
   )
 }

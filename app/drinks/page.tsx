@@ -1,7 +1,5 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
-
 import {
   DndContext,
   closestCenter,
@@ -13,6 +11,8 @@ import {
   verticalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable"
+
+import React, { useEffect, useState } from "react"
 import { CSS } from "@dnd-kit/utilities"
 
 import { supabase } from "@/lib/supabase"
@@ -88,8 +88,79 @@ function SortableRow({
   )
 }
 
+function SortableCategoryItem({
+  cat,
+  index,
+}: {
+  cat: any
+  index: number
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({
+    id: cat.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    display: "flex",
+    alignItems: "center",
+    gap: "15px",
+    padding: "0 15px",
+    height: "56px",
+    borderBottom: "1px solid #ddd",
+    background: "#fff",
+    color: "#222",
+    fontWeight: 700,
+    fontSize: "18px",
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+    >
+      <span
+        {...listeners}
+        {...attributes}
+        style={{
+          cursor: "grab",
+          fontSize: "20px",
+          width: "30px",
+          textAlign: "center",
+          color: "#555",
+          flexShrink: 0,
+        }}
+      >
+        ☰
+      </span>
+
+      <span style={{ width: "40px", textAlign: "center", fontWeight: 700, color: "#333", flexShrink: 0 }}>
+        {index + 1}
+      </span>
+
+      <span style={{
+        fontWeight: 700,
+        color: "#111",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        flex: 1,
+      }}>
+        {cat.name}
+      </span>
+    </div>
+  )
+}
+
 export default function Drinks() {
   const [drinks, setDrinks] = useState<Drink[]>([])
+  const [toast, setToast] = useState("")
   const [userData, setUserData] = useState<any>(null)
   const isAdmin = userData?.role === "admin"
   const [selected, setSelected] = useState<number[]>([])
@@ -107,7 +178,9 @@ export default function Drinks() {
   const [newCategory, setNewCategory] = useState("")
   const [isTranslating, setIsTranslating] = useState(false)
   const [showAddAddCategory, setShowAddAddCategory] = useState(false) // For add modal's category add
-  const [isSaving, setIsSaving] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [showDrinkCategoryModal, setShowDrinkCategoryModal] = useState(false)
+  const [drinkCategories, setDrinkCategories] = useState<any[]>([])
   const [showAdd, setShowAdd] = useState(false)
   const [newDrink, setNewDrink] = useState({
     name_ja: "",
@@ -175,16 +248,7 @@ export default function Drinks() {
           : null,
       }))
 
-      const priorityOrder = [
-        "BEER",
-        "BEER_COCKTAIL",
-        "COCKTAIL",
-        "BOMB",
-        "WINE",
-        "AWAMORI",
-        "NON_ALCHOL",
-        "SOFT_DRINK",
-      ]
+      const priorityOrder = categories
 
       const sortedData = [...list].sort((a, b) => {
         const idxA = priorityOrder.indexOf(a.drinkcategory)
@@ -216,7 +280,7 @@ export default function Drinks() {
   useEffect(() => {
     load()
     loadUser()
-  }, [selectedFilterCategory, selectedFilterPrice]); // フィルター状態が変更されたら再フェッチ
+  }, [selectedFilterCategory, selectedFilterPrice, categories]); // フィルター状態やカテゴリーが変更されたら再フェッチ
 
   const loadUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -232,21 +296,27 @@ export default function Drinks() {
     setUserData(data)
   }
 
-  useEffect(() => {
-    const loadCategories = async () => {
-      const { data, error } = await supabase
-        .from("drink_categories")
-        .select("name")
-        .order("name")
+  const loadDrinkCategories = async () => {
+    const { data, error } = await supabase
+      .from("drink_categories")
+      .select("*")
+      .order("display_order")
 
-      console.log("Drink categories data:", data, "error:", error)
-
-      if (data) {
-        setCategories(data.map(c => c.name))
-      }
+    if (error) {
+      console.error(error)
+      return
     }
 
-    loadCategories()
+    setDrinkCategories(data || [])
+
+    // 既存のセレクトボックスなどが categories (string[]) に依存しているため同期させます
+    if (data) {
+      setCategories(data.map((c: any) => c.name))
+    }
+  }
+
+  useEffect(() => {
+    loadDrinkCategories()
   }, [])
 
   const start = (page - 1) * perPage
@@ -275,7 +345,7 @@ export default function Drinks() {
   const saveEdit = async () => {
     if (!editDrink) return
 
-    setIsSaving(true)
+    setSaving(true)
 
     const { error } = await supabase
       .from("world_drinks")
@@ -295,12 +365,12 @@ export default function Drinks() {
     if (error) {
       console.error("UPDATE ERROR:", error)
       alert(error.message)
-      setIsSaving(false)
+      setSaving(false)
       return
     }
 
     load()
-    setIsSaving(false)
+    setSaving(false)
     setShowEdit(false)
   }
 
@@ -337,7 +407,7 @@ export default function Drinks() {
       return
     }
 
-    setIsSaving(true)
+    setSaving(true)
     const { data, error } = await supabase
       .from("world_drinks")
       .insert([
@@ -357,12 +427,12 @@ export default function Drinks() {
 
     if (error) {
       console.error("INSERT ERROR:", error)
-      setIsSaving(false)
+      setSaving(false)
       return
     }
 
     load()
-    setIsSaving(false)
+    setSaving(false)
 
     // 初期化
     setNewDrink({
@@ -431,6 +501,55 @@ export default function Drinks() {
     setCategories(updated)
     setNewCategoryName("")
     return name
+  }
+
+  const saveCategoryOrder = async () => {
+    setSaving(true)
+
+    for (let i = 0; i < drinkCategories.length; i++) {
+      await supabase
+        .from("drink_categories")
+        .update({
+          display_order: i + 1,
+        })
+        .eq("id", drinkCategories[i].id)
+    }
+
+    await loadDrinkCategories()
+    await load()
+
+    setSaving(false)
+    setShowDrinkCategoryModal(false)
+
+    setToast("🍺 カテゴリー順を更新しました")
+
+    setTimeout(() => {
+      setToast("")
+    }, 3000)
+  }
+
+  const handleCategoryDragEnd = (event: any) => {
+    const { active, over } = event
+
+    if (!over) return
+
+    if (active.id === over.id) return
+
+    setDrinkCategories((items) => {
+      const oldIndex = items.findIndex(
+        (item) => item.id === active.id
+      )
+
+      const newIndex = items.findIndex(
+        (item) => item.id === over.id
+      )
+
+      return arrayMove(
+        items,
+        oldIndex,
+        newIndex
+      )
+    })
   }
 
   // addCategoryはもう使わないので削除
@@ -994,6 +1113,13 @@ export default function Drinks() {
         </button>
 
         <button
+          style={{ fontSize: "12px" }}
+            onClick={() => setShowDrinkCategoryModal(true)}
+        >
+          カテゴリー管理
+        </button>
+
+        <button
           onClick={exportCSV}
           style={{ fontSize: "12px", color: "#2e7d32" }}
         >
@@ -1082,7 +1208,7 @@ export default function Drinks() {
             }}
           >
             {/* 翻訳中・保存中のオーバーレイ表示 */}
-            {(isTranslating || isSaving) && (
+            {(isTranslating || saving) && (
               <div style={{
                 position: "absolute",
                 inset: 0,
@@ -1355,7 +1481,7 @@ export default function Drinks() {
             position: "relative",
           }}>
             {/* 翻訳中・保存中のオーバーレイ */}
-            {(isTranslating || isSaving) && (
+            {(isTranslating || saving) && (
               <div style={{
                 position: "absolute",
                 inset: 0,
@@ -1602,6 +1728,127 @@ export default function Drinks() {
               <button onClick={bulkUpdateCategory}>変更</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {showDrinkCategoryModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              width: "700px",
+              maxHeight: "80vh",
+              overflowY: "auto",
+              borderRadius: "12px",
+              position: "relative",
+            }}
+          >
+            {/* 保存中のオーバーレイ */}
+            {saving && (
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                backgroundColor: "rgba(255, 255, 255, 0.7)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 100,
+              }}>
+                <div className="loader" />
+                <p style={{ marginTop: "16px", color: "#8B5E3C", fontWeight: "bold" }}>保存中...</p>
+              </div>
+            )}
+
+            <div
+              style={{
+                height: "20px",
+                background: "#7a5a3a",
+                borderTopLeftRadius: "12px",
+                borderTopRightRadius: "12px",
+              }}
+            />
+
+            <div style={{ padding: "20px" }}>
+              <h2 style={{ textAlign: "center" }}>
+                Drink Categories
+              </h2>
+
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragEnd={handleCategoryDragEnd}
+              >
+                <SortableContext
+                  items={drinkCategories.map((cat) => cat.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div style={{ border: "1px solid #ddd", borderRadius: "8px", overflow: "hidden" }}>
+                    {drinkCategories.map((cat, index) => (
+                      <SortableCategoryItem key={cat.id} cat={cat} index={index} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+
+              <div
+                style={{
+                  marginTop: "20px",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "10px"
+                }}
+              >
+                <button
+                  onClick={() =>
+                    setShowDrinkCategoryModal(false)
+                  }
+                >
+                  閉じる
+                </button>
+                <button
+                  onClick={saveCategoryOrder}
+                  disabled={saving}
+                >
+                  {saving ? "保存中..." : "保存"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            background: "#7a5a3a",
+            color: "#fff",
+            padding: "12px 24px",
+            borderRadius: "12px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+            zIndex: 99999,
+            fontSize: "16px",
+            fontWeight: 600,
+            textAlign: "center",
+            minWidth: "260px",
+            opacity: 0.95,
+          }}
+        >
+          {toast}
         </div>
       )}
 
