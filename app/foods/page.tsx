@@ -44,6 +44,43 @@ type Food = {
   createdat?: Date | null
 }
 
+function SortableTableRow({
+  item,
+  children,
+}: {
+  item: any
+  children: any
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({
+    id: item.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(
+      transform
+    ),
+    transition,
+  }
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={{
+        ...style,
+        opacity: item.isactive ? 1 : 0.4,
+      }}
+    >
+      {children(attributes, listeners)}
+    </tr>
+  )
+}
+
 export default function Foods() {
   const [foods, setFoods] = useState<Food[]>([])
   const [userData, setUserData] = useState<any>(null)
@@ -179,6 +216,19 @@ export default function Foods() {
       (item) => item.id === over.id
     )
 
+    const activeItem = foods[oldIndex]
+    const overItem = foods[newIndex]
+
+    if (
+      activeItem.foodcategory !==
+      overItem.foodcategory
+    ) {
+      showAlert(
+        "カテゴリーを跨いで移動することはできません。"
+      )
+      return
+    }
+
     const newFoods = arrayMove(
       foods,
       oldIndex,
@@ -186,6 +236,25 @@ export default function Foods() {
     )
 
     setFoods(newFoods)
+
+    try {
+      const updates = newFoods.map(
+        (food, index) =>
+          supabase
+            .from("world_foods")
+            .update({
+              display_order: index + 1,
+            })
+            .eq("id", food.id)
+      )
+
+      await Promise.all(updates)
+    } catch (error) {
+      console.error(
+        "DISPLAY ORDER UPDATE ERROR",
+        error
+      )
+    }
   }
 
   // 📸 メモリリーク防止: previewImageが変わるたびに古いObjectURLを解放
@@ -224,6 +293,50 @@ export default function Foods() {
     }
 
     loadCategories()
+  }, [])
+
+  useEffect(() => {
+    const foodsChannel = supabase
+      .channel("foods-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "world_foods",
+        },
+        () => {
+          fetchFoods()
+        }
+      )
+      .subscribe()
+
+    const categoriesChannel = supabase
+      .channel("food-categories-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "food_categories",
+        },
+        async () => {
+          const { data } = await supabase
+            .from("food_categories")
+            .select("*")
+            .order("display_order")
+
+          if (data) {
+            setCategories(data)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(foodsChannel)
+      supabase.removeChannel(categoriesChannel)
+    }
   }, [])
 
   useEffect(() => {
@@ -846,6 +959,14 @@ export default function Foods() {
 
       {/* 画面表示用エリア（ページネーション・ボタン・操作用テーブル） */}
       <div className="no-print">
+        <DndContext
+          collisionDetection={closestCenter}
+          onDragEnd={handleFoodDragEnd}
+        >
+          <SortableContext
+            items={view.map(item => item.id)}
+            strategy={verticalListSortingStrategy}
+          >
         <table
         style={{
           width: "100%",
@@ -879,12 +1000,12 @@ export default function Foods() {
 
         <tbody>
           {view.map(item => (
-            <tr
+            <SortableTableRow
               key={item.id}
-              style={{
-                opacity: item.isactive ? 1 : 0.4
-              }}
+              item={item}
             >
+              {(attributes, listeners) => (
+                <>
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "0" }}>
                 <input
                   type="checkbox"
@@ -895,6 +1016,8 @@ export default function Foods() {
               </td>
 
               <td
+                {...attributes}
+                {...listeners}
                 style={{
                   border: "1px solid #ddd",
                   textAlign: "center",
@@ -1070,10 +1193,14 @@ export default function Foods() {
                   削除
                 </button>
               </td>
-            </tr>
+                </>
+              )}
+            </SortableTableRow>
           ))}
         </tbody>
         </table>
+          </SortableContext>
+        </DndContext>
 
         <div style={{ marginTop: "10px", fontSize: "14px", color: "#666" }}>
         選択中: {selected.length} 件
@@ -1174,6 +1301,11 @@ export default function Foods() {
       </div>
 
       {/* 印刷用全件テーブル（通常は非表示、印刷時のみ foods ステートから全件表示） */}
+      <DndContext collisionDetection={closestCenter}>
+        <SortableContext
+          items={foods.map(f => f.id)}
+          strategy={verticalListSortingStrategy}
+        >
       <table
         id="print-area"
         className="print-only"
@@ -1188,7 +1320,7 @@ export default function Foods() {
       >
         <thead>
           <tr style={{ background: "#ddd" }}>
-            <th style={{ width: "3%" }}></th>
+            <th style={{ width: "40px" }}></th>
             <th style={{ width: "7%", textAlign: "center" }}>画像</th>
             <th style={{ width: "15%", textAlign: "center" }}>名前</th>
             <th style={{ width: "15%", textAlign: "center" }}>英語名</th>
@@ -1201,16 +1333,23 @@ export default function Foods() {
         </thead>
         <tbody>
           {foods.map(f => (
-            <tr key={f.id} style={{ opacity: f.isactive ? 1 : 0.4 }}>
+            <SortableTableRow
+              key={f.id}
+              item={f}
+            >
+              {(attributes, listeners) => (
+                <>
               <td
+                {...attributes}
+                {...listeners}
                 style={{
                   border: "1px solid #ddd",
                   textAlign: "center",
-                  padding: "2px 4px",
+                  width: "40px",
                   cursor: "grab",
+                  color: "#666",
                   fontWeight: "bold",
                   fontSize: "18px",
-                  color: "#666",
                 }}
               >
                 ≡
@@ -1257,10 +1396,14 @@ export default function Foods() {
                 {f.isactive ? "○" : "×"}
               </td>
               <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}></td>
-            </tr>
+                </>
+              )}
+            </SortableTableRow>
           ))}
         </tbody>
       </table>
+        </SortableContext>
+      </DndContext>
 
       {showEdit && editFood && (
         <div className="modalOverlay">
