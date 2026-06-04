@@ -1,9 +1,24 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { uploadImage } from "@/lib/uploadImage" // uploadImageユーティリティは引き続き使用
 import { deleteImage } from "@/lib/deleteImage"
+import {
+  DndContext,
+  closestCenter,
+} from "@dnd-kit/core"
+
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable"
+
+import {
+  CSS,
+} from "@dnd-kit/utilities"
 
 type Food = {
   id: number
@@ -33,6 +48,8 @@ export default function Foods() {
   const [foods, setFoods] = useState<Food[]>([])
   const [userData, setUserData] = useState<any>(null)
   const isAdmin = userData?.role === "admin"
+  const [dragMode, setDragMode] =
+    useState(false)
   const [selected, setSelected] = useState<number[]>([])
   const [page, setPage] = useState(1)
   const [showEdit, setShowEdit] = useState(false)
@@ -143,6 +160,33 @@ export default function Foods() {
     fetchFoods()
     loadUser()
   }, [selectedFilterCategory, selectedFilterPrice, categories]); // カテゴリー情報の読み込み完了時にも再フェッチ
+
+  const handleFoodDragEnd = async (
+    event: any
+  ) => {
+
+    const { active, over } = event
+
+    if (!over) return
+
+    if (active.id === over.id) return
+
+    const oldIndex = foods.findIndex(
+      (item) => item.id === active.id
+    )
+
+    const newIndex = foods.findIndex(
+      (item) => item.id === over.id
+    )
+
+    const newFoods = arrayMove(
+      foods,
+      oldIndex,
+      newIndex
+    )
+
+    setFoods(newFoods)
+  }
 
   // 📸 メモリリーク防止: previewImageが変わるたびに古いObjectURLを解放
   useEffect(() => {
@@ -821,6 +865,7 @@ export default function Foods() {
                 checked={view.length > 0 && view.every(v => selected.includes(v.id))}
               />
             </th>
+            <th style={{ width: "40px" }}></th>
             <th style={{ width: "7%", textAlign: "center" }}>画像</th>
             <th style={{ width: "15%", textAlign: "center" }}>名前</th>
             <th style={{ width: "15%", textAlign: "center" }}>英語名</th>
@@ -836,7 +881,9 @@ export default function Foods() {
           {view.map(item => (
             <tr
               key={item.id}
-              style={{ opacity: item.isactive ? 1 : 0.4 }}
+              style={{
+                opacity: item.isactive ? 1 : 0.4
+              }}
             >
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "0" }}>
                 <input
@@ -845,6 +892,20 @@ export default function Foods() {
                   onChange={() => toggle(item.id)}
                   style={{ transform: "scale(0.8)" }}
                 />
+              </td>
+
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  textAlign: "center",
+                  width: "40px",
+                  cursor: "grab",
+                  color: "#666",
+                  fontWeight: "bold",
+                  fontSize: "18px",
+                }}
+              >
+                ≡
               </td>
 
               <td style={{ border: "1px solid #ddd", textAlign: "center", width: "60px" }}>
@@ -1141,7 +1202,19 @@ export default function Foods() {
         <tbody>
           {foods.map(f => (
             <tr key={f.id} style={{ opacity: f.isactive ? 1 : 0.4 }}>
-              <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}></td>
+              <td
+                style={{
+                  border: "1px solid #ddd",
+                  textAlign: "center",
+                  padding: "2px 4px",
+                  cursor: "grab",
+                  fontWeight: "bold",
+                  fontSize: "18px",
+                  color: "#666",
+                }}
+              >
+                ≡
+              </td>
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px" }}>
                 {f.imageurl && (
                   <img
