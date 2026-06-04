@@ -81,10 +81,81 @@ function SortableTableRow({
   )
 }
 
+function SortableCategoryItem({
+  cat,
+  index,
+}: {
+  cat: any
+  index: number
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({
+    id: cat.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    display: "flex",
+    alignItems: "center",
+    gap: "15px",
+    padding: "0 15px",
+    height: "56px",
+    borderBottom: "1px solid #ddd",
+    background: "#fff",
+    color: "#222",
+    fontWeight: 700,
+    fontSize: "18px",
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+    >
+      <span
+        {...listeners}
+        {...attributes}
+        style={{
+          cursor: "grab",
+          fontSize: "20px",
+          width: "30px",
+          textAlign: "center",
+          color: "#555",
+          flexShrink: 0,
+        }}
+      >
+        ≡
+      </span>
+
+      <span style={{ width: "40px", textAlign: "center", fontWeight: 700, color: "#333", flexShrink: 0 }}>
+        {index + 1}
+      </span>
+
+      <span style={{
+        fontWeight: 700,
+        color: "#111",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        flex: 1,
+      }}>
+        {cat.name}
+      </span>
+    </div>
+  )
+}
+
 export default function Foods() {
   const [foods, setFoods] = useState<Food[]>([])
   const [userData, setUserData] = useState<any>(null)
   const isAdmin = userData?.role === "admin"
+  const [toast, setToast] = useState("")
   const [dragMode, setDragMode] =
     useState(false)
   const [selected, setSelected] = useState<number[]>([])
@@ -99,6 +170,10 @@ export default function Foods() {
   const [showPriceModal, setShowPriceModal] = useState(false)
   const [newPrice, setNewPrice] = useState("")
   const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [
+    showCategoryManager,
+    setShowCategoryManager,
+  ] = useState(false)
   const [bulkCategory, setBulkCategory] = useState("")
   const [showAdd, setShowAdd] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -255,6 +330,82 @@ export default function Foods() {
         error
       )
     }
+  }
+
+  const saveFoodCategoryOrder = async () => {
+    try {
+
+      setIsSaving(true)
+
+      for (
+        let i = 0;
+        i < categories.length;
+        i++
+      ) {
+
+        const { error } = await supabase
+          .from("food_categories")
+          .update({
+            display_order: i + 1,
+          })
+          .eq(
+            "id",
+            categories[i].id
+          )
+
+        if (error) {
+          console.error(error)
+        }
+      }
+
+      setShowCategoryManager(false)
+
+      showAlert(
+        "カテゴリー順を保存しました"
+      )
+
+    } catch (err) {
+
+      console.error(err)
+
+      showAlert(
+        "保存失敗"
+      )
+
+    } finally {
+
+      setIsSaving(false)
+
+    }
+  }
+
+  const handleCategoryDragEnd = (event: any) => {
+    const { active, over } = event
+
+    console.log("ACTIVE", active?.id)
+    console.log("OVER", over?.id)
+
+    if (!over || active.id === over.id) return
+
+    setCategories((items) => {
+      const oldIndex = items.findIndex(
+        (item) => item.id === active.id
+      )
+
+      const newIndex = items.findIndex(
+        (item) => item.id === over.id
+      )
+
+      const result = arrayMove(
+        items,
+        oldIndex,
+        newIndex
+      )
+
+      console.log("NEW ORDER", result)
+
+      return result
+    })
   }
 
   // 📸 メモリリーク防止: previewImageが変わるたびに古いObjectURLを解放
@@ -580,7 +731,7 @@ export default function Foods() {
         return
       }
 
-      await fetchFoods()
+      // await fetchFoods()
 
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
@@ -673,8 +824,15 @@ export default function Foods() {
       showAlert("カテゴリーの追加に失敗しました: " + error.message)
       return null
     }
-    // ステートの構造（オブジェクト配列）を維持
-    const updated = [...categories, { name }].sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+    const updated = [
+      ...categories,
+      {
+        name,
+        display_order:
+          categories.length + 1,
+      },
+    ]
+
     setCategories(updated)
     setNewCategoryName("")
     return name
@@ -717,7 +875,7 @@ export default function Foods() {
         .eq("id", target.id),
     ]);
 
-    await fetchFoods();
+    // await fetchFoods();
   }
 
   const moveDown = async (item: Food) => {
@@ -755,7 +913,7 @@ export default function Foods() {
         .eq("id", target.id),
     ]);
 
-    await fetchFoods();
+    // await fetchFoods();
   }
 
   const bulkDelete = async () => {
@@ -1285,6 +1443,13 @@ export default function Foods() {
           }}
         >
           一括削除
+        </button>
+
+        <button
+          style={{ fontSize: "12px" }}
+          onClick={() => setShowCategoryManager(true)}
+        >
+          カテゴリー管理
         </button>
 
         <button
@@ -2357,6 +2522,110 @@ export default function Foods() {
             </div>
 
           </div>
+        </div>
+      )}
+
+      {showCategoryManager && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              width: "700px",
+              maxHeight: "80vh",
+              overflowY: "auto",
+              borderRadius: "12px",
+              position: "relative",
+            }}
+          >
+            {isSaving && (
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                backgroundColor: "rgba(255, 255, 255, 0.7)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 100,
+              }}>
+                <div className="loader" />
+                <p style={{ marginTop: "16px", color: "#8B5E3C", fontWeight: "bold" }}>保存中...</p>
+              </div>
+            )}
+
+            <div
+              style={{
+                height: "20px",
+                background: "#7a5a3a",
+                borderTopLeftRadius: "12px",
+                borderTopRightRadius: "12px",
+              }}
+            />
+
+            <div style={{ padding: "20px" }}>
+              <h2 style={{ textAlign: "center" }}>Food Categories</h2>
+
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragEnd={handleCategoryDragEnd}
+              >
+                <SortableContext
+                  items={categories.map((cat) => cat.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div style={{ border: "1px solid #ddd", borderRadius: "8px", overflow: "hidden" }}>
+                    {categories.map((cat, index) => (
+                      <SortableCategoryItem key={cat.id} cat={cat} index={index} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+
+              <div style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <button onClick={() => setShowCategoryManager(false)}>閉じる</button>
+                <button
+                  onClick={saveFoodCategoryOrder}
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            background: "#7a5a3a",
+            color: "#fff",
+            padding: "12px 24px",
+            borderRadius: "12px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+            zIndex: 99999,
+            fontSize: "16px",
+            fontWeight: 600,
+            textAlign: "center",
+            minWidth: "260px",
+            opacity: 0.95,
+          }}
+        >
+          {toast}
         </div>
       )}
 
