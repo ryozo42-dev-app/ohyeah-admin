@@ -1075,7 +1075,15 @@ export default function Foods() {
       </h1>
 
       {/* フィルターUI */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "15px", flexWrap: "wrap" }}>
+      <div
+        className="no-print"
+        style={{
+          display: "flex",
+          gap: "10px",
+          marginBottom: "15px",
+          flexWrap: "wrap",
+        }}
+      >
         {/* カテゴリーフィルター */}
         <div>
           <label htmlFor="foodCategoryFilter" style={{ marginRight: "5px" }}>カテゴリー:</label>
@@ -1466,11 +1474,6 @@ export default function Foods() {
       </div>
 
       {/* 印刷用全件テーブル（通常は非表示、印刷時のみ foods ステートから全件表示） */}
-      <DndContext collisionDetection={closestCenter}>
-        <SortableContext
-          items={foods.map(f => f.id)}
-          strategy={verticalListSortingStrategy}
-        >
       <table
         id="print-area"
         className="print-only"
@@ -1485,40 +1488,18 @@ export default function Foods() {
       >
         <thead>
           <tr style={{ background: "#ddd" }}>
-            <th style={{ width: "40px" }}></th>
-            <th style={{ width: "7%", textAlign: "center" }}>画像</th>
+            <th style={{ width: "7%" }}>画像</th>
             <th style={{ width: "15%", textAlign: "center" }}>名前</th>
             <th style={{ width: "15%", textAlign: "center" }}>英語名</th>
             <th style={{ width: "10%", textAlign: "center" }}>カテゴリー</th>
             <th style={{ width: "30%", textAlign: "center" }}>説明</th>
             <th style={{ width: "8%", textAlign: "center" }}>価格</th>
             <th style={{ width: "5%", textAlign: "center" }}>表示</th>
-            <th style={{ width: "7%", textAlign: "center" }}>操作</th>
           </tr>
         </thead>
         <tbody>
-          {foods.map(f => (
-            <SortableTableRow
-              key={f.id}
-              item={f}
-            >
-              {(attributes, listeners) => (
-                <>
-              <td
-                {...attributes}
-                {...listeners}
-                style={{
-                  border: "1px solid #ddd",
-                  textAlign: "center",
-                  width: "40px",
-                  cursor: "grab",
-                  color: "#666",
-                  fontWeight: "bold",
-                  fontSize: "18px",
-                }}
-              >
-                ≡
-              </td>
+          {foods.map((f) => (
+            <tr key={f.id}>
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px" }}>
                 {f.imageurl && (
                   <img
@@ -1530,7 +1511,7 @@ export default function Foods() {
                       objectFit: "cover",
                       borderRadius: "4px",
                       display: "block",
-                      margin: "0 auto"
+                      margin: "0 auto",
                     }}
                   />
                 )}
@@ -1549,7 +1530,7 @@ export default function Foods() {
                   border: "1px solid #ddd",
                   padding: "2px 4px",
                   whiteSpace: "normal",
-                  textAlign: "left"
+                  textAlign: "left",
                 }}
               >
                 {f.description || "-"}
@@ -1560,15 +1541,10 @@ export default function Foods() {
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
                 {f.isactive ? "○" : "×"}
               </td>
-              <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}></td>
-                </>
-              )}
-            </SortableTableRow>
+            </tr>
           ))}
         </tbody>
       </table>
-        </SortableContext>
-      </DndContext>
 
       {showEdit && editFood && (
         <div className="modalOverlay">

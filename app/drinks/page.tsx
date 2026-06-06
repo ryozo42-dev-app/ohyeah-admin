@@ -32,8 +32,6 @@ type Drink = {
 
   price?: number
 
-  imageurl?: string
-
   isactive: boolean
 
   display_order?: number
@@ -236,8 +234,6 @@ export default function Drinks() {
         drinkcategory: d.drinkcategory || "",
 
         price: d.price || 0,
-
-        imageurl: d.imageurl || "",
 
         isactive: d.isactive ?? true,
 
@@ -770,7 +766,7 @@ export default function Drinks() {
     }
 
     // ヘッダー
-    const header = ["id", "name_ja", "name_en", "name_zh", "name_ko", "drinkcategory", "description", "price", "imageurl", "isactive", "display_order"]
+    const header = ["id", "name_ja", "name_en", "name_zh", "name_ko", "drinkcategory", "description", "price", "isactive", "display_order"]
 
     // データ
     const rows = drinks.map(item => [
@@ -782,7 +778,6 @@ export default function Drinks() {
       item.drinkcategory || "",
       item.description || "",
       item.price,
-      item.imageurl || "",
       item.isactive,
       item.display_order || 0
     ])
@@ -812,7 +807,10 @@ export default function Drinks() {
       </h1>
 
       {/* フィルターUI */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "15px", flexWrap: "wrap" }}>
+      <div
+        className="no-print"
+        style={{ display: "flex", gap: "10px", marginBottom: "15px", flexWrap: "wrap" }}
+      >
         {/* カテゴリーフィルター */}
         <div>
           <label htmlFor="drinkCategoryFilter" style={{ marginRight: "5px" }}>カテゴリー:</label>
@@ -872,7 +870,7 @@ export default function Drinks() {
         <thead>
           <tr style={{ background: "#ddd" }}>
             <th style={{ width: "40px" }}></th>
-            <th style={{ width: "3%" }}>
+            <th className="no-print" style={{ width: "3%" }}>
               <input
                 type="checkbox"
                 onChange={toggleAll}
@@ -895,7 +893,7 @@ export default function Drinks() {
                   key={item.id}
                   item={item}
                 >
-                  <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
+                  <td className="no-print" style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
                     <input
                       type="checkbox"
                       checked={selected.includes(item.id)}
@@ -1147,29 +1145,24 @@ export default function Drinks() {
       >
         <thead>
           <tr style={{ background: "#ddd" }}>
-            <th style={{ width: "40px" }}></th>
-            <th style={{ width: "3%" }}></th>
-            <th style={{ width: "18%", textAlign: "center" }}>名前</th>
-            <th style={{ width: "18%", textAlign: "center" }}>英語名</th>
+            <th style={{ width: "20%", textAlign: "center" }}>名前</th>
+            <th style={{ width: "20%", textAlign: "center" }}>英語名</th>
             <th style={{ width: "10%", textAlign: "center" }}>カテゴリー</th>
-            <th style={{ width: "31%", textAlign: "center" }}>説明</th>
+            <th style={{ width: "37%", textAlign: "center" }}>説明</th>
             <th style={{ width: "8%", textAlign: "center" }}>価格</th>
             <th style={{ width: "5%", textAlign: "center" }}>表示</th>
-            <th style={{ width: "7%", textAlign: "center" }}>操作</th>
           </tr>
         </thead>
         <tbody>
           {drinks.map(item => (
-            <tr key={item.id} style={{ opacity: item.isactive ? 1 : 0.4 }}>
-              <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}></td>
-              <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}></td>
+            <tr key={item.id}>
               <td style={{ border: "1px solid #ddd", padding: "2px 4px", whiteSpace: "nowrap" }}>
                 {item.name_ja}
               </td>
               <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
                 {item.name_en}
               </td>
-              <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}>
+              <td style={{ border: "1px solid #ddd", padding: "2px 4px", textAlign: "center" }}>
                 {item.drinkcategory}
               </td>
               <td
@@ -1188,7 +1181,6 @@ export default function Drinks() {
               <td style={{ border: "1px solid #ddd", textAlign: "center", padding: "2px 4px" }}>
                 {item.isactive ? "○" : "×"}
               </td>
-              <td style={{ border: "1px solid #ddd", padding: "2px 4px" }}></td>
             </tr>
           ))}
         </tbody>
